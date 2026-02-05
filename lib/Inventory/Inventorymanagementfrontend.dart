@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../Customers/Customerservice.dart';
 import 'Inventoryservice.dart';
-
 
 class InventoryManagement extends StatefulWidget {
   const InventoryManagement({super.key});
@@ -12,8 +12,12 @@ class InventoryManagement extends StatefulWidget {
 
 class _InventoryManagementState extends State<InventoryManagement> {
   final _inventoryService = InventoryService();
+  final _customerService = CustomerService();
+
   List<ApplicationModel> _applications = [];
   List<ApplicationModel> _filteredApplications = [];
+  Map<int, double> _appCustomerCredits = {}; // App ID -> Total Customer Credits
+
   bool _isLoading = true;
   bool _isAdding = false;
   String _searchQuery = '';
@@ -26,6 +30,12 @@ class _InventoryManagementState extends State<InventoryManagement> {
   final _searchController = TextEditingController();
 
   Map<String, dynamic> _statistics = {};
+
+  // ✅ New top summary totals
+  double _sumStandardValue = 0.0;   // Σ (coins * perCoinRate)
+  double _sumWholesaleValue = 0.0;  // Σ (coins * wholesaleRate)
+  double _sumCustomerCredit = 0.0;  // Σ customer_applications.total_credit
+  double _sumPreviousCredit = 0.0;  // Σ applications.previous_credit
 
   @override
   void initState() {
@@ -50,9 +60,51 @@ class _InventoryManagementState extends State<InventoryManagement> {
     try {
       setState(() => _isLoading = true);
       final apps = await _inventoryService.getApplications();
+
+      // ✅ 1) customer credit totals per app + overall
+      Map<int, double> appCredits = {};
+      double allCustomerCredit = 0.0;
+
+      try {
+        final customers = await _customerService.getCustomers();
+        for (var customer in customers) {
+          try {
+            final customerApps = await _customerService.getCustomerApplications(customer.id);
+            for (var customerApp in customerApps) {
+              final int appId = (customerApp['application_id'] as num).toInt();
+              final double credit = (customerApp['total_credit'] as num).toDouble();
+              appCredits[appId] = (appCredits[appId] ?? 0.0) + credit;
+              allCustomerCredit += credit;
+            }
+          } catch (e) {
+            // ignore per-customer failures
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // ✅ 2) inventory value totals
+      double sumStd = 0.0;
+      double sumWs = 0.0;
+      double sumPrevCredit = 0.0;
+
+      for (final a in apps) {
+        sumStd += (a.totalCoins * a.perCoinRate);
+        sumWs += (a.totalCoins * a.wholesaleRate);
+        sumPrevCredit += a.previousCredit;
+      }
+
       setState(() {
         _applications = apps;
         _filteredApplications = apps;
+        _appCustomerCredits = appCredits;
+
+        _sumStandardValue = sumStd;
+        _sumWholesaleValue = sumWs;
+        _sumCustomerCredit = allCustomerCredit;
+        _sumPreviousCredit = sumPrevCredit;
+
         _isLoading = false;
       });
     } catch (e) {
@@ -67,9 +119,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
     try {
       final stats = await _inventoryService.getStatistics();
       setState(() => _statistics = stats);
-    } catch (e) {
-      print('Error fetching statistics: $e');
-    }
+    } catch (_) {}
   }
 
   void _onSearchChanged() {
@@ -255,14 +305,6 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   isNumber: true,
                   decimal: true,
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'New Credit will be set to 0',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -283,14 +325,12 @@ class _InventoryManagementState extends State<InventoryManagement> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                        AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                         : const Text(
                       'Add Application',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -304,16 +344,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
   void _showEditDialog(ApplicationModel app) {
     final nameController = TextEditingController(text: app.applicationName);
-    final prevCreditController =
-    TextEditingController(text: app.previousCredit.toString());
-    final newCreditController =
-    TextEditingController(text: app.newCredit.toString());
-    final totalCoinsController =
-    TextEditingController(text: app.totalCoins.toString());
-    final perCoinRateController =
-    TextEditingController(text: app.perCoinRate.toString());
-    final wholesaleRateController =
-    TextEditingController(text: app.wholesaleRate.toString());
+    final prevCreditController = TextEditingController(text: app.previousCredit.toString());
+    final newCreditController = TextEditingController(text: app.newCredit.toString());
+    final totalCoinsController = TextEditingController(text: app.totalCoins.toString());
+    final perCoinRateController = TextEditingController(text: app.perCoinRate.toString());
+    final wholesaleRateController = TextEditingController(text: app.wholesaleRate.toString());
 
     showDialog(
       context: context,
@@ -331,11 +366,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   children: [
                     const Text(
                       'Edit Application',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
@@ -358,6 +389,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   isNumber: true,
                 ),
                 const SizedBox(height: 16),
+                // ✅ keep your schema field, but you requested "don’t show new credit in inventory"
+                // This edit dialog can still keep it (admin usage).
                 _buildTextField(
                   controller: newCreditController,
                   label: 'New Credit',
@@ -391,37 +424,6 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   isNumber: true,
                   decimal: true,
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Total Credit',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${(double.tryParse(prevCreditController.text) ?? 0) + (double.tryParse(newCreditController.text) ?? 0)}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -432,9 +434,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           backgroundColor: Colors.grey[300],
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text('Cancel'),
                       ),
@@ -456,9 +456,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text('Save'),
                       ),
@@ -485,7 +483,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
       )
           : Column(
         children: [
-          // Header with green gradient - reduced width with rounded borders
+          // Header
           Center(
             child: Container(
               width: MediaQuery.of(context).size.width * 0.85,
@@ -493,10 +491,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF2E7D32),
-                    Color(0xFF1B5E20),
-                  ],
+                  colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -507,19 +502,12 @@ class _InventoryManagementState extends State<InventoryManagement> {
                 children: [
                   const Text(
                     'Inventory Management',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${_applications.length} Applications • Total Coins: ${(_statistics['totalCoins'] ?? 0).toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
+                    '${_applications.length} Applications',
+                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
                   ),
                 ],
               ),
@@ -528,48 +516,44 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
           const SizedBox(height: 16),
 
-          // Statistics Cards
-          if (_statistics.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _statisticsCard(
-                      label: 'Total Apps',
-                      value: _statistics['totalApplications'].toString(),
-                      icon: Icons.inventory_2,
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(width: 12),
-                    _statisticsCard(
-                      label: 'Total Coins',
-                      value: (_statistics['totalCoins'] ?? 0)
-                          .toStringAsFixed(2),
-                      icon: Icons.toll,
-                      color: Colors.orange,
-                    ),
-                    const SizedBox(width: 12),
-                    _statisticsCard(
-                      label: 'Avg Coin Rate',
-                      value: (_statistics['avgPerCoinRate'] ?? 0)
-                          .toStringAsFixed(4),
-                      icon: Icons.trending_up,
-                      color: Colors.purple,
-                    ),
-                    const SizedBox(width: 12),
-                    _statisticsCard(
-                      label: 'Avg Wholesale',
-                      value: (_statistics['avgWholesaleRate'] ?? 0)
-                          .toStringAsFixed(4),
-                      icon: Icons.baby_changing_station,
-                      color: Colors.indigo,
-                    ),
-                  ],
-                ),
+          // ✅ NEW: Top 4 summary cards (your requirement)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _statisticsCard(
+                    label: 'Total Std Value',
+                    value: _sumStandardValue.toStringAsFixed(2),
+                    icon: Icons.trending_up,
+                    color: Colors.teal,
+                  ),
+                  const SizedBox(width: 12),
+                  _statisticsCard(
+                    label: 'Total Wholesale Value',
+                    value: _sumWholesaleValue.toStringAsFixed(2),
+                    icon: Icons.local_offer,
+                    color: Colors.deepPurple,
+                  ),
+                  const SizedBox(width: 12),
+                  _statisticsCard(
+                    label: 'Customers Total Credit',
+                    value: _sumCustomerCredit.toStringAsFixed(2),
+                    icon: Icons.people,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 12),
+                  _statisticsCard(
+                    label: 'Previous Credit Total',
+                    value: _sumPreviousCredit.toStringAsFixed(2),
+                    icon: Icons.payments,
+                    color: Colors.green,
+                  ),
+                ],
               ),
             ),
+          ),
 
           const SizedBox(height: 16),
 
@@ -580,17 +564,14 @@ class _InventoryManagementState extends State<InventoryManagement> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search applications...',
-                prefixIcon:
-                const Icon(Icons.search, color: Colors.blue),
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  const BorderSide(color: Colors.blue, width: 1),
+                  borderSide: const BorderSide(color: Colors.blue, width: 1),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  const BorderSide(color: Colors.blue, width: 2),
+                  borderSide: const BorderSide(color: Colors.blue, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.white,
@@ -600,23 +581,16 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
           const SizedBox(height: 16),
 
-          // Applications List - Tabular View
           Expanded(
             child: _filteredApplications.isEmpty
                 ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.inventory_2,
-                    size: 64,
-                    color: Colors.grey[300],
-                  ),
+                  Icon(Icons.inventory_2, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
                   Text(
-                    _searchQuery.isEmpty
-                        ? 'No applications yet'
-                        : 'No applications found',
+                    _searchQuery.isEmpty ? 'No applications yet' : 'No applications found',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -631,37 +605,33 @@ class _InventoryManagementState extends State<InventoryManagement> {
               itemCount: _filteredApplications.length,
               itemBuilder: (context, index) {
                 final app = _filteredApplications[index];
-                final coinValue = app.totalCoins * app.perCoinRate;
-                final wholesaleValue =
-                    app.totalCoins * app.wholesaleRate;
+
+                // ✅ Requested display changes
+                final stockValue = app.totalCoins * app.perCoinRate; // Stock Value
+                final standardValue = app.totalCoins * app.perCoinRate;
+                final wholesaleValue = app.totalCoins * app.wholesaleRate;
+
+                final customerTotalCredit = _appCustomerCredits[app.id] ?? 0.0;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       border: Border(
-                        left: BorderSide(
-                          color: Colors.green[700]!,
-                          width: 5,
-                        ),
+                        left: BorderSide(color: Colors.green[700]!, width: 5),
                       ),
                       color: Colors.white,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Application Name Header with Action Menu
                           Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: Text(
@@ -680,26 +650,19 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                   PopupMenuItem(
                                     child: const Row(
                                       children: [
-                                        Icon(Icons.edit,
-                                            color: Colors.blue),
+                                        Icon(Icons.edit, color: Colors.blue),
                                         SizedBox(width: 8),
                                         Text('Edit'),
                                       ],
                                     ),
                                     onTap: () {
-                                      Future.delayed(
-                                        const Duration(
-                                            milliseconds: 200),
-                                            () =>
-                                            _showEditDialog(app),
-                                      );
+                                      Future.delayed(const Duration(milliseconds: 200), () => _showEditDialog(app));
                                     },
                                   ),
                                   PopupMenuItem(
                                     child: const Row(
                                       children: [
-                                        Icon(Icons.delete,
-                                            color: Colors.red),
+                                        Icon(Icons.delete, color: Colors.red),
                                         SizedBox(width: 8),
                                         Text('Delete'),
                                       ],
@@ -707,36 +670,23 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                     onTap: () {
                                       showDialog(
                                         context: context,
-                                        builder: (context) =>
-                                            AlertDialog(
-                                              title: const Text(
-                                                  'Delete Application'),
-                                              content: const Text(
-                                                  'Are you sure you want to delete this application?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                          context),
-                                                  child: const Text(
-                                                      'Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () {
-                                                    _deleteApplication(
-                                                        app.id);
-                                                    Navigator.pop(
-                                                        context);
-                                                  },
-                                                  child: const Text(
-                                                    'Delete',
-                                                    style: TextStyle(
-                                                        color: Colors
-                                                            .red),
-                                                  ),
-                                                ),
-                                              ],
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Delete Application'),
+                                          content: const Text('Are you sure you want to delete this application?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('Cancel'),
                                             ),
+                                            TextButton(
+                                              onPressed: () {
+                                                _deleteApplication(app.id);
+                                                Navigator.pop(context);
+                                              },
+                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                            ),
+                                          ],
+                                        ),
                                       );
                                     },
                                   ),
@@ -749,17 +699,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           const Divider(height: 1, color: Colors.grey),
                           const SizedBox(height: 12),
 
-                          // Tabular Data with Headers in Columns
+                          // ✅ Table updated: remove New Credit, add Stock Value
                           Table(
                             border: TableBorder(
-                              horizontalInside: BorderSide(
-                                color: Colors.grey[300]!,
-                                width: 1,
-                              ),
-                              bottom: BorderSide(
-                                color: Colors.grey[300]!,
-                                width: 1,
-                              ),
+                              horizontalInside: BorderSide(color: Colors.grey[300]!, width: 1),
+                              bottom: BorderSide(color: Colors.grey[300]!, width: 1),
                             ),
                             columnWidths: const {
                               0: FlexColumnWidth(1.5),
@@ -768,82 +712,48 @@ class _InventoryManagementState extends State<InventoryManagement> {
                               3: FlexColumnWidth(1.5),
                             },
                             children: [
-                              // Header Row
                               TableRow(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                ),
+                                decoration: BoxDecoration(color: Colors.grey[200]),
                                 children: [
                                   _tableCell('Previous\nCredit', true),
-                                  _tableCell('New\nCredit', true),
-                                  _tableCell('Total\nCredit', true),
+                                  _tableCell('Customer\nTotal Credit', true),
                                   _tableCell('Total\nCoins', true),
+                                  _tableCell('Stock\nValue', true), // ✅ new
                                 ],
                               ),
-                              // Data Row 1
                               TableRow(
                                 children: [
-                                  _tableCell(
-                                    app.previousCredit
-                                        .toStringAsFixed(2),
-                                    false,
-                                    Colors.green,
-                                  ),
-                                  _tableCell(
-                                    app.newCredit.toStringAsFixed(2),
-                                    false,
-                                    Colors.blue,
-                                  ),
-                                  _tableCell(
-                                    app.totalCredit
-                                        .toStringAsFixed(2),
-                                    false,
-                                    Colors.deepPurple,
-                                  ),
-                                  _tableCell(
-                                    app.totalCoins.toStringAsFixed(2),
-                                    false,
-                                    Colors.orange,
-                                  ),
+                                  _tableCell(app.previousCredit.toStringAsFixed(2), false, Colors.green),
+                                  _tableCell(customerTotalCredit.toStringAsFixed(2), false, Colors.deepPurple),
+                                  _tableCell(app.totalCoins.toStringAsFixed(2), false, Colors.orange),
+                                  _tableCell(stockValue.toStringAsFixed(2), false, Colors.teal), // ✅
                                 ],
                               ),
-                              // Header Row 2
+
+                              // ✅ below that: coins × rate and coins × wholesale rate + values
                               TableRow(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                ),
+                                decoration: BoxDecoration(color: Colors.grey[200]),
                                 children: [
-                                  _tableCell('Per Coin\nRate', true),
-                                  _tableCell('Coin\nValue', true),
-                                  _tableCell('Wholesale\nRate', true),
+                                  _tableCell('Coins ×\nRate', true),
+                                  _tableCell('Std\nValue', true),
+                                  _tableCell('Coins ×\nWholesale', true),
                                   _tableCell('Wholesale\nValue', true),
                                 ],
                               ),
-                              // Data Row 2
                               TableRow(
                                 children: [
                                   _tableCell(
-                                    app.perCoinRate
-                                        .toStringAsFixed(4),
+                                    '${app.totalCoins.toStringAsFixed(2)} × ${app.perCoinRate.toStringAsFixed(4)}',
                                     false,
                                     Colors.purple,
                                   ),
+                                  _tableCell(standardValue.toStringAsFixed(2), false, Colors.teal),
                                   _tableCell(
-                                    coinValue.toStringAsFixed(2),
-                                    false,
-                                    Colors.teal,
-                                  ),
-                                  _tableCell(
-                                    app.wholesaleRate
-                                        .toStringAsFixed(4),
+                                    '${app.totalCoins.toStringAsFixed(2)} × ${app.wholesaleRate.toStringAsFixed(4)}',
                                     false,
                                     Colors.indigo,
                                   ),
-                                  _tableCell(
-                                    wholesaleValue.toStringAsFixed(2),
-                                    false,
-                                    Colors.red,
-                                  ),
+                                  _tableCell(wholesaleValue.toStringAsFixed(2), false, Colors.red),
                                 ],
                               ),
                             ],
@@ -867,11 +777,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
     );
   }
 
-  Widget _tableCell(
-      String text,
-      bool isHeader, [
-        Color? color,
-      ]) {
+  Widget _tableCell(String text, bool isHeader, [Color? color]) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Text(
@@ -897,9 +803,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
     return TextField(
       controller: controller,
       keyboardType: isNumber
-          ? decimal
+          ? (decimal
           ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.number
+          : TextInputType.number)
           : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
@@ -949,14 +855,14 @@ class _InventoryManagementState extends State<InventoryManagement> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
@@ -966,10 +872,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10, color: Colors.black54),
-          ),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
         ],
       ),
     );

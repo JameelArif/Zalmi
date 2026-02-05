@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../Inventory/Inventoryservice.dart';
+import 'CustomersProfile.dart';
 import 'Customerservice.dart';
 
 
@@ -36,6 +37,7 @@ class _CustomerManagementState extends State<CustomerManagement> {
   void initState() {
     super.initState();
     _loadApplications();
+    _loadCustomers();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -63,29 +65,19 @@ class _CustomerManagementState extends State<CustomerManagement> {
   Future<void> _loadCustomers() async {
     try {
       setState(() => _isLoading = true);
+
       final customers = await _customerService.getCustomers();
 
-      // Filter to only customers with apps
-      List<CustomerModel> customersWithApps = [];
-      for (var customer in customers) {
-        try {
-          final apps = await _customerService
-              .getCustomerApplications(customer.id);
-          if (apps.isNotEmpty) {
-            customersWithApps.add(customer);
-          }
-        } catch (e) {
-          print('Error loading apps for customer ${customer.id}: $e');
-        }
-      }
-
       setState(() {
-        _customers = customersWithApps;
-        _filteredCustomers = customersWithApps;
-        _totalCustomers = customersWithApps.length;
-        _totalCredit = 0.0;
+        _customers = customers;                 // ✅ keep ALL
+        _filteredCustomers = customers;         // ✅ show ALL initially
+        _totalCustomers = customers.length;
+        _totalCredit = 0.0;                    // will be computed in _applyFilters
         _isLoading = false;
       });
+
+      // optionally compute credit totals
+      await _applyFilters();
     } catch (e) {
       if (mounted) {
         _showSnackBar('Error: ${e.toString()}', Colors.red);
@@ -93,6 +85,7 @@ class _CustomerManagementState extends State<CustomerManagement> {
       setState(() => _isLoading = false);
     }
   }
+
 
   void _onSearchChanged() {
     _searchQuery = _searchController.text.toLowerCase();
@@ -1529,141 +1522,3 @@ class _AddAppDialogWithNotifierState extends State<_AddAppDialogWithNotifier> {
 // ============================================
 // CUSTOMER PROFILE PAGE
 // ============================================
-class CustomerProfilePage extends StatefulWidget {
-  final CustomerModel customer;
-
-  const CustomerProfilePage({required this.customer});
-
-  @override
-  State<CustomerProfilePage> createState() => _CustomerProfilePageState();
-}
-
-class _CustomerProfilePageState extends State<CustomerProfilePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.customer.customerName),
-        backgroundColor: Colors.blue,
-        elevation: 0,
-      ),
-      backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border(
-                    left: BorderSide(
-                      color: Colors.blue[700]!,
-                      width: 5,
-                    ),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Customer Details',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDetailRow(
-                      'Name',
-                      widget.customer.customerName,
-                      Colors.blue,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      'Contact',
-                      widget.customer.customerContact,
-                      Colors.green,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      'ID',
-                      widget.customer.id.toString(),
-                      Colors.purple,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'More Details Coming Soon',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.info, size: 48, color: Colors.blue[300]),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Additional features like transactions, history, and more will be added here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            textAlign: TextAlign.end,
-          ),
-        ),
-      ],
-    );
-  }
-}

@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:zalmiwholeseller/EXPENSIS/expenses_management_ui.dart';
+import 'package:zalmiwholeseller/dashboard.dart';
+import 'package:zalmiwholeseller/profile.dart';
 
+import 'BankAccounts/Bankaccountmanagementui.dart';
 import 'Customers/Customermanagementfrontend.dart';
+import 'Employess/Employeemanagementui.dart';
 import 'Inventory/Inventorymanagementfrontend.dart';
+
+// ✅ Approvals screen
+import 'Approvals/admin_sales_approval_screen.dart';
+
+// ✅ Sales page
+import 'Purchases/purchases.dart';
+import 'Sales/admin_sales_page.dart';
+
+// ✅ Purchases page (NEW)
+
 import 'Prevoius code/Login/authservice.dart';
 import 'Prevoius code/Login/loginscreen.dart';
-
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -22,6 +36,7 @@ class _HomeShellState extends State<HomeShell> {
     'Inventory',
     'Profile',
     'Sales',
+    'Approvals',
     'Employee',
     'Bank Accounts',
     'Expenses',
@@ -36,6 +51,7 @@ class _HomeShellState extends State<HomeShell> {
     Icons.inventory_2,
     Icons.person,
     Icons.shopping_cart,
+    Icons.verified_user,
     Icons.people,
     Icons.account_balance,
     Icons.money_off,
@@ -99,25 +115,16 @@ class _HomeShellState extends State<HomeShell> {
         child: Column(
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.deepPurple,
-              ),
+              decoration: const BoxDecoration(color: Colors.deepPurple),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.admin_panel_settings,
-                    size: 48,
-                    color: Colors.white,
-                  ),
+                  const Icon(Icons.admin_panel_settings, size: 48, color: Colors.white),
                   const SizedBox(height: 8),
                   Text(
                     currentUser?.email ?? 'Admin',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
@@ -130,10 +137,7 @@ class _HomeShellState extends State<HomeShell> {
                   return Container(
                     color: isSelected ? Colors.grey[300] : Colors.transparent,
                     child: ListTile(
-                      leading: Icon(
-                        _menuIcons[index],
-                        color: Colors.blue[700],
-                      ),
+                      leading: Icon(_menuIcons[index], color: Colors.blue[700]),
                       title: Text(
                         _menuItems[index],
                         style: const TextStyle(
@@ -152,16 +156,10 @@ class _HomeShellState extends State<HomeShell> {
             ),
             const Divider(),
             ListTile(
-              leading: Icon(
-                Icons.logout,
-                color: Colors.blue[700],
-              ),
+              leading: Icon(Icons.logout, color: Colors.blue[700]),
               title: const Text(
                 'Logout',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -171,20 +169,28 @@ class _HomeShellState extends State<HomeShell> {
           ],
         ),
       ),
+
+      // ✅ Updated IndexedStack: Purchases page added
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          _buildPlaceholder(_menuItems[0], _menuIcons[0]), // Dashboard
-          const InventoryManagement(), // Inventory
-          _buildPlaceholder(_menuItems[2], _menuIcons[2]), // Profile
-          _buildPlaceholder(_menuItems[3], _menuIcons[3]), // Sales
-          _buildPlaceholder(_menuItems[4], _menuIcons[4]), // Employee
-          _buildPlaceholder(_menuItems[5], _menuIcons[5]), // Bank Accounts
-          _buildPlaceholder(_menuItems[6], _menuIcons[6]), // Expenses
-          _buildPlaceholder(_menuItems[7], _menuIcons[7]), // Profits
-          const CustomerManagement(), // Customers
-          _buildPlaceholder(_menuItems[9], _menuIcons[9]), // Purchases
-          _buildPlaceholder(_menuItems[10], _menuIcons[10]), // Gifting & Rewards
+          const AdminDashboardPage(), // Dashboard
+          const InventoryManagement(),                    // Inventory
+          const AdminProfilePage(), // Profile
+
+          const AdminSalesPage(),                         // Sales
+          const AdminSalesApprovalScreen(),               // Approvals
+          const EmployeeManagement(),                     // Employee
+          const BankAccountManagement(),                  // Bank Accounts
+
+         const ExpensesManagement(), // Expenses
+          _buildPlaceholder(_menuItems[8], _menuIcons[8]), // Profits
+          const CustomerManagement(),                     // Customers
+
+          // ✅ Purchases (NEW - connected page)
+          const AdminPurchasesPage(),
+
+          _buildPlaceholder(_menuItems[11], _menuIcons[11]), // Gifting & Rewards
         ],
       ),
     );
@@ -195,21 +201,11 @@ class _HomeShellState extends State<HomeShell> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 64,
-            color: Colors.deepPurple[200],
-          ),
+          Icon(icon, size: 64, color: Colors.deepPurple[200]),
           const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(
-            'Content coming soon',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
+          Text('Content coming soon', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         ],
       ),
     );
