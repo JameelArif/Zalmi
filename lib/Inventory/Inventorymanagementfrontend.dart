@@ -32,8 +32,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
   Map<String, dynamic> _statistics = {};
 
   // ✅ New top summary totals
-  double _sumStandardValue = 0.0;   // Σ (coins * perCoinRate)
-  double _sumWholesaleValue = 0.0;  // Σ (coins * wholesaleRate)
+  double _sumStandardValue = 0.0;   // Σ (coins ÷ perCoinRate)
+  double _sumWholesaleValue = 0.0;  // Σ (coins ÷ wholesaleRate)
   double _sumCustomerCredit = 0.0;  // Σ customer_applications.total_credit
   double _sumPreviousCredit = 0.0;  // Σ applications.previous_credit
 
@@ -84,14 +84,19 @@ class _InventoryManagementState extends State<InventoryManagement> {
         // ignore
       }
 
-      // ✅ 2) inventory value totals
+      // ✅ 2) inventory value totals - CORRECTED TO DIVISION
       double sumStd = 0.0;
       double sumWs = 0.0;
       double sumPrevCredit = 0.0;
 
       for (final a in apps) {
-        sumStd += (a.totalCoins * a.perCoinRate);
-        sumWs += (a.totalCoins * a.wholesaleRate);
+        // ✅ CORRECTED: Division instead of multiplication
+        if (a.perCoinRate > 0) {
+          sumStd += (a.totalCoins / a.perCoinRate);
+        }
+        if (a.wholesaleRate > 0) {
+          sumWs += (a.totalCoins / a.wholesaleRate);
+        }
         sumPrevCredit += a.previousCredit;
       }
 
@@ -389,8 +394,6 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   isNumber: true,
                 ),
                 const SizedBox(height: 16),
-                // ✅ keep your schema field, but you requested "don’t show new credit in inventory"
-                // This edit dialog can still keep it (admin usage).
                 _buildTextField(
                   controller: newCreditController,
                   label: 'New Credit',
@@ -516,7 +519,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
           const SizedBox(height: 16),
 
-          // ✅ NEW: Top 4 summary cards (your requirement)
+          // ✅ Top 4 summary cards
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SingleChildScrollView(
@@ -606,10 +609,18 @@ class _InventoryManagementState extends State<InventoryManagement> {
               itemBuilder: (context, index) {
                 final app = _filteredApplications[index];
 
-                // ✅ Requested display changes
-                final stockValue = app.totalCoins * app.perCoinRate; // Stock Value
-                final standardValue = app.totalCoins * app.perCoinRate;
-                final wholesaleValue = app.totalCoins * app.wholesaleRate;
+                // ✅ CORRECTED: Division instead of multiplication
+                final stockValue = app.perCoinRate > 0
+                    ? (app.totalCoins / app.perCoinRate)
+                    : 0.0;
+
+                final standardValue = app.perCoinRate > 0
+                    ? (app.totalCoins / app.perCoinRate)
+                    : 0.0;
+
+                final wholesaleValue = app.wholesaleRate > 0
+                    ? (app.totalCoins / app.wholesaleRate)
+                    : 0.0;
 
                 final customerTotalCredit = _appCustomerCredits[app.id] ?? 0.0;
 
@@ -699,7 +710,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           const Divider(height: 1, color: Colors.grey),
                           const SizedBox(height: 12),
 
-                          // ✅ Table updated: remove New Credit, add Stock Value
+                          // ✅ Table with corrected calculations
                           Table(
                             border: TableBorder(
                               horizontalInside: BorderSide(color: Colors.grey[300]!, width: 1),
@@ -718,7 +729,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                   _tableCell('Previous\nCredit', true),
                                   _tableCell('Customer\nTotal Credit', true),
                                   _tableCell('Total\nCoins', true),
-                                  _tableCell('Stock\nValue', true), // ✅ new
+                                  _tableCell('Stock\nValue', true),
                                 ],
                               ),
                               TableRow(
@@ -726,30 +737,30 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                   _tableCell(app.previousCredit.toStringAsFixed(2), false, Colors.green),
                                   _tableCell(customerTotalCredit.toStringAsFixed(2), false, Colors.deepPurple),
                                   _tableCell(app.totalCoins.toStringAsFixed(2), false, Colors.orange),
-                                  _tableCell(stockValue.toStringAsFixed(2), false, Colors.teal), // ✅
+                                  _tableCell(stockValue.toStringAsFixed(2), false, Colors.teal),
                                 ],
                               ),
 
-                              // ✅ below that: coins × rate and coins × wholesale rate + values
+                              // ✅ CORRECTED: Show division formula
                               TableRow(
                                 decoration: BoxDecoration(color: Colors.grey[200]),
                                 children: [
-                                  _tableCell('Coins ×\nRate', true),
+                                  _tableCell('Coins ÷\nRate', true),
                                   _tableCell('Std\nValue', true),
-                                  _tableCell('Coins ×\nWholesale', true),
+                                  _tableCell('Coins ÷\nWholesale', true),
                                   _tableCell('Wholesale\nValue', true),
                                 ],
                               ),
                               TableRow(
                                 children: [
                                   _tableCell(
-                                    '${app.totalCoins.toStringAsFixed(2)} × ${app.perCoinRate.toStringAsFixed(4)}',
+                                    '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.perCoinRate.toStringAsFixed(4)}',
                                     false,
                                     Colors.purple,
                                   ),
                                   _tableCell(standardValue.toStringAsFixed(2), false, Colors.teal),
                                   _tableCell(
-                                    '${app.totalCoins.toStringAsFixed(2)} × ${app.wholesaleRate.toStringAsFixed(4)}',
+                                    '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.wholesaleRate.toStringAsFixed(4)}',
                                     false,
                                     Colors.indigo,
                                   ),

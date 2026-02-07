@@ -11,7 +11,7 @@ class BankAccountModel {
   final String accountNumber;
   final double openingBalance;
   final double currentBalance;
-  final String status; // 'active' or 'inactive'
+  final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -97,7 +97,7 @@ class BankTransactionModel {
   final int adminId;
   final int fromAccountId;
   final int? toAccountId;
-  final String transactionType; // 'transfer' or 'withdrawal'
+  final String transactionType;
   final double amount;
   final String reason;
   final String? referenceNo;
@@ -159,12 +159,54 @@ class BankTransactionModel {
 }
 
 // ============================================
+// ✅ NEW: BALANCE EDIT LOG MODEL
+// ============================================
+class BalanceEditLogModel {
+  final int id;
+  final int adminId;
+  final int accountId;
+  final double previousBalance;
+  final double newBalance;
+  final double changeAmount;
+  final String editType; // 'increase' or 'decrease'
+  final String reason;
+  final DateTime createdAt;
+
+  BalanceEditLogModel({
+    required this.id,
+    required this.adminId,
+    required this.accountId,
+    required this.previousBalance,
+    required this.newBalance,
+    required this.changeAmount,
+    required this.editType,
+    required this.reason,
+    required this.createdAt,
+  });
+
+  factory BalanceEditLogModel.fromJson(Map<String, dynamic> json) {
+    return BalanceEditLogModel(
+      id: json['id'] as int,
+      adminId: json['admin_id'] as int,
+      accountId: json['account_id'] as int,
+      previousBalance: (json['previous_balance'] as num).toDouble(),
+      newBalance: (json['new_balance'] as num).toDouble(),
+      changeAmount: (json['change_amount'] as num).toDouble(),
+      editType: json['edit_type'] as String,
+      reason: json['reason'] as String,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+    );
+  }
+}
+
+// ============================================
 // BANK ACCOUNT SERVICE
 // ============================================
 class BankAccountService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Get current admin ID
   Future<int> _getAdminId() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -184,7 +226,6 @@ class BankAccountService {
     }
   }
 
-  // Get all bank accounts
   Future<List<BankAccountModel>> getBankAccounts() async {
     try {
       final adminId = await _getAdminId();
@@ -203,7 +244,6 @@ class BankAccountService {
     }
   }
 
-  // Get active bank accounts only
   Future<List<BankAccountModel>> getActiveBankAccounts() async {
     try {
       final adminId = await _getAdminId();
@@ -223,7 +263,6 @@ class BankAccountService {
     }
   }
 
-  // Add new bank account
   Future<BankAccountModel> addBankAccount({
     required String bankName,
     required String holderName,
@@ -263,7 +302,6 @@ class BankAccountService {
           .select()
           .single();
 
-      // Handle response - it might be List or Map
       final jsonData = response is List ? response[0] : response;
       return BankAccountModel.fromJson(jsonData as Map<String, dynamic>);
     } catch (e) {
@@ -271,7 +309,6 @@ class BankAccountService {
     }
   }
 
-  // Update bank account
   Future<BankAccountModel> updateBankAccount({
     required int id,
     String? bankName,
@@ -321,7 +358,81 @@ class BankAccountService {
     }
   }
 
-  // Delete bank account
+  // ✅ NEW: Edit Balance with Reason and Logging
+  Future<void> editAccountBalance({
+    required int accountId,
+    required double newBalance,
+    required String reason,
+  }) async {
+    try {
+      final adminId = await _getAdminId();
+
+      if (newBalance < 0) {
+        throw Exception('Balance cannot be negative');
+      }
+
+      if (reason.trim().isEmpty) {
+        throw Exception('Reason for edit is required');
+      }
+
+      // Get current account
+      final account = await _supabase
+          .from('bank_accounts')
+          .select()
+          .eq('id', accountId)
+          .eq('admin_id', adminId)
+          .single();
+
+      final accountJson = account is List ? account[0] : account;
+      final accountData = BankAccountModel.fromJson(accountJson as Map<String, dynamic>);
+
+      final previousBalance = accountData.currentBalance;
+      final changeAmount = (newBalance - previousBalance).abs();
+      final editType = newBalance > previousBalance ? 'increase' : 'decrease';
+
+      // Create log entry
+      await _supabase.from('balance_edit_logs').insert({
+        'admin_id': adminId,
+        'account_id': accountId,
+        'previous_balance': previousBalance,
+        'new_balance': newBalance,
+        'change_amount': changeAmount,
+        'edit_type': editType,
+        'reason': reason.trim(),
+      });
+
+      // Update balance
+      await _supabase
+          .from('bank_accounts')
+          .update({'current_balance': newBalance})
+          .eq('id', accountId)
+          .eq('admin_id', adminId);
+
+    } catch (e) {
+      throw Exception('Error editing balance: $e');
+    }
+  }
+
+  // ✅ NEW: Get Balance Edit Logs for Account
+  Future<List<BalanceEditLogModel>> getBalanceEditLogs(int accountId) async {
+    try {
+      final adminId = await _getAdminId();
+
+      final response = await _supabase
+          .from('balance_edit_logs')
+          .select()
+          .eq('admin_id', adminId)
+          .eq('account_id', accountId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((item) => BalanceEditLogModel.fromJson(item))
+          .toList();
+    } catch (e) {
+      throw Exception('Error fetching edit logs: $e');
+    }
+  }
+
   Future<void> deleteBankAccount(int id) async {
     try {
       final adminId = await _getAdminId();
@@ -336,7 +447,6 @@ class BankAccountService {
     }
   }
 
-  // Transfer between accounts
   Future<BankTransactionModel> transferBetweenAccounts({
     required int fromAccountId,
     required int toAccountId,
@@ -359,7 +469,6 @@ class BankAccountService {
         throw Exception('Reason cannot be empty');
       }
 
-      // Get from account
       final fromAccount = await _supabase
           .from('bank_accounts')
           .select()
@@ -378,7 +487,6 @@ class BankAccountService {
         throw Exception('Insufficient balance in from account');
       }
 
-      // Get to account
       final toAccount = await _supabase
           .from('bank_accounts')
           .select()
@@ -393,7 +501,6 @@ class BankAccountService {
         throw Exception('To account is inactive');
       }
 
-      // Create transaction
       final transactionResponse = await _supabase
           .from('bank_transactions')
           .insert({
@@ -411,7 +518,6 @@ class BankAccountService {
 
       final transactionJson = transactionResponse is List ? transactionResponse[0] : transactionResponse;
 
-      // Update balances
       await _supabase
           .from('bank_accounts')
           .update({'current_balance': fromAccountData.currentBalance - amount})
@@ -428,7 +534,6 @@ class BankAccountService {
     }
   }
 
-  // Withdraw from account
   Future<BankTransactionModel> withdrawFromAccount({
     required int accountId,
     required double amount,
@@ -446,7 +551,6 @@ class BankAccountService {
         throw Exception('Reason cannot be empty');
       }
 
-      // Get account
       final account = await _supabase
           .from('bank_accounts')
           .select()
@@ -465,7 +569,6 @@ class BankAccountService {
         throw Exception('Insufficient balance');
       }
 
-      // Create transaction
       final transactionResponse = await _supabase
           .from('bank_transactions')
           .insert({
@@ -483,7 +586,6 @@ class BankAccountService {
 
       final transactionJson = transactionResponse is List ? transactionResponse[0] : transactionResponse;
 
-      // Update balance
       await _supabase
           .from('bank_accounts')
           .update({'current_balance': accountData.currentBalance - amount})
@@ -495,7 +597,6 @@ class BankAccountService {
     }
   }
 
-  // Get transactions with filters
   Future<List<BankTransactionModel>> getTransactions({
     DateTime? fromDate,
     DateTime? toDate,
@@ -539,7 +640,6 @@ class BankAccountService {
     }
   }
 
-  // Get account balance
   Future<double> getAccountBalance(int accountId) async {
     try {
       final adminId = await _getAdminId();
@@ -557,7 +657,6 @@ class BankAccountService {
     }
   }
 
-  // Get total balance across all active accounts
   Future<double> getTotalBalance() async {
     try {
       final accounts = await getActiveBankAccounts();
@@ -571,7 +670,6 @@ class BankAccountService {
     }
   }
 
-  // Get statistics
   Future<Map<String, dynamic>> getBankStatistics() async {
     try {
       final adminId = await _getAdminId();
@@ -592,7 +690,6 @@ class BankAccountService {
         }
       }
 
-      // Get transaction statistics
       final transactions = await _supabase
           .from('bank_transactions')
           .select()

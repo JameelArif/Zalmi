@@ -90,18 +90,17 @@ class PurchasesService {
     String paymentType = 'all',
     String searchText = '',
   }) async {
-    // ✅ Build query step by step
     var query = _sb
         .from('purchases')
         .select(
-      'id, purchase_date, payment_type, purchased_coins, amount_pkr, '
+      'id, purchase_date, payment_type, purchased_coins, amount_pkr, amount_usd, '
           'vendor_name, note, cash_amount, bank_amount, '
-          'applications(id, application_name), '
+          'selling_price_value, wholesale_price_value, '
+          'applications(id, application_name, per_coin_rate, wholesale_rate), '
           'bank_accounts(id, bank_name, account_number)',
     )
         .eq('admin_id', adminId);
 
-    // Date filters - chain properly
     if (from != null) {
       query = query.gte('purchase_date', from.toIso8601String());
     }
@@ -111,24 +110,20 @@ class PurchasesService {
       query = query.lte('purchase_date', end.toIso8601String());
     }
 
-    // Application filter
     if (applicationId != null) {
       query = query.eq('application_id', applicationId);
     }
 
-    // Payment type filter
     if (paymentType != 'all') {
       query = query.eq('payment_type', paymentType);
     }
 
-    // ✅ Execute with order + limit at the end
     final response = await query
         .order('purchase_date', ascending: false)
         .limit(300);
 
     var rows = List<Map<String, dynamic>>.from(response as List);
 
-    // Manual text search
     if (searchText.isNotEmpty) {
       final text = searchText.toLowerCase();
       rows = rows.where((r) {
@@ -156,6 +151,7 @@ class PurchasesService {
     required int applicationId,
     required double purchasedCoins,
     required double amountPkr,
+    double? amountUsd,
     required String paymentType,
     int? bankAccountId,
     double? cashAmount,
@@ -172,6 +168,7 @@ class PurchasesService {
           'p_application_id': applicationId,
           'p_purchased_coins': purchasedCoins,
           'p_amount_pkr': amountPkr,
+          'p_amount_usd': amountUsd ?? 0,
           'p_payment_type': paymentType,
           'p_bank_account_id': bankAccountId,
           'p_cash_amount': cashAmount,
@@ -195,21 +192,33 @@ class PurchasesService {
   Future<Map<String, dynamic>> getPurchaseStats(int adminId) async {
     final response = await _sb
         .from('purchases')
-        .select('purchased_coins, amount_pkr')
+        .select('purchased_coins, amount_pkr, amount_usd, selling_price_value, wholesale_price_value')
         .eq('admin_id', adminId);
 
     double totalCoins = 0;
-    double totalAmount = 0;
+    double totalPkr = 0;
+    double totalUsd = 0;
+    double totalSellingValue = 0;
+    double totalWholesaleValue = 0;
 
     for (final r in (response as List)) {
       totalCoins += toDouble(r['purchased_coins']);
-      totalAmount += toDouble(r['amount_pkr']);
+      totalPkr += toDouble(r['amount_pkr']);
+      totalUsd += toDouble(r['amount_usd']);
+      totalSellingValue += toDouble(r['selling_price_value']);
+      totalWholesaleValue += toDouble(r['wholesale_price_value']);
     }
 
     return {
       'total_coins': totalCoins,
-      'total_amount': totalAmount,
-      'avg_cost_per_coin': totalCoins > 0 ? totalAmount / totalCoins : 0,
+      'total_pkr': totalPkr,
+      'total_usd': totalUsd,
+      'total_selling_value': totalSellingValue,
+      'total_wholesale_value': totalWholesaleValue,
+      'avg_cost_per_coin_pkr': totalCoins > 0 ? totalPkr / totalCoins : 0,
+      'avg_cost_per_coin_usd': totalCoins > 0 ? totalUsd / totalCoins : 0,
+      'potential_profit_selling': totalSellingValue - totalPkr,
+      'potential_profit_wholesale': totalWholesaleValue - totalPkr,
       'purchase_count': response.length,
     };
   }

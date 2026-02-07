@@ -19,6 +19,7 @@ import 'Sales/admin_sales_page.dart';
 
 import 'Prevoius code/Login/authservice.dart';
 import 'Prevoius code/Login/loginscreen.dart';
+import 'cutsomer_addition.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -176,7 +177,7 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           const AdminDashboardPage(), // Dashboard
           const InventoryManagement(),                    // Inventory
-          const AdminProfilePage(), // Profile
+          const BulkCustomerImportPage(), // Profile
 
           const AdminSalesPage(),                         // Sales
           const AdminSalesApprovalScreen(),               // Approvals

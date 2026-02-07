@@ -125,6 +125,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
     // Controllers
     final coinsCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
+    final usdCtrl = TextEditingController();
     final cashCtrl = TextEditingController();
     final bankCtrl = TextEditingController();
     final vendorCtrl = TextEditingController();
@@ -163,7 +164,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 2) Coins & Amount (2 columns)
+                  // 2) Coins & Amount PKR (2 columns)
                   Row(
                     children: [
                       Expanded(
@@ -193,7 +194,20 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 3) Payment Type
+                  // 3) Amount USD
+                  TextField(
+                    controller: usdCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Amount USD (optional)',
+                      border: OutlineInputBorder(),
+                      prefixText: '\$ ',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 4) Payment Type
                   DropdownButtonFormField<String>(
                     value: selectedPaymentType,
                     items: const [
@@ -210,7 +224,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 4) Bank (if needed)
+                  // 5) Bank (if needed)
                   if (isBankNeeded) ...[
                     if (_banks.isEmpty)
                       Container(
@@ -242,7 +256,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                     const SizedBox(height: 12),
                   ],
 
-                  // 5) Mix amounts (if mix payment)
+                  // 6) Mix amounts (if mix payment)
                   if (selectedPaymentType == 'mix') ...[
                     Row(
                       children: [
@@ -274,7 +288,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                     const SizedBox(height: 12),
                   ],
 
-                  // 6) Vendor & Note
+                  // 7) Vendor & Note
                   TextField(
                     controller: vendorCtrl,
                     decoration: const InputDecoration(
@@ -285,6 +299,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: noteCtrl,
+                    maxLines: 2,
                     decoration: const InputDecoration(
                       labelText: 'Note (optional)',
                       border: OutlineInputBorder(),
@@ -292,7 +307,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 7) Purchase Date
+                  // 8) Purchase Date
                   OutlinedButton.icon(
                     onPressed: () async {
                       final picked = await showDatePicker(
@@ -363,6 +378,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                 appId: selectedAppId,
                 coins: coins,
                 amount: amount,
+                usdAmount: _svc.toDouble(usdCtrl.text),
                 paymentType: selectedPaymentType,
                 bankId: selectedBankId,
                 cashAmount: cashAmt,
@@ -388,6 +404,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
     required int appId,
     required double coins,
     required double amount,
+    double? usdAmount,
     required String paymentType,
     int? bankId,
     double? cashAmount,
@@ -404,6 +421,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
         applicationId: appId,
         purchasedCoins: coins,
         amountPkr: amount,
+        amountUsd: usdAmount,
         paymentType: paymentType,
         bankAccountId: bankId,
         cashAmount: cashAmount,
@@ -438,6 +456,8 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
         0.0, (s, r) => s + _svc.toDouble(r['amount_pkr']));
     final totalCoins = _purchaseRows.fold<double>(
         0.0, (s, r) => s + _svc.toDouble(r['purchased_coins']));
+    final totalUsd = _purchaseRows.fold<double>(
+        0.0, (s, r) => s + _svc.toDouble(r['amount_usd']));
 
     return Scaffold(
       appBar: AppBar(
@@ -465,7 +485,10 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
           _buildFiltersCard(),
           const SizedBox(height: 10),
           _buildResultsCard(
-              totalPkr: totalPkr, totalCoins: totalCoins),
+            totalPkr: totalPkr,
+            totalCoins: totalCoins,
+            totalUsd: totalUsd,
+          ),
         ],
       ),
     );
@@ -670,7 +693,13 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
   Widget _buildResultsCard({
     required double totalPkr,
     required double totalCoins,
+    required double totalUsd,
   }) {
+    final totalSellingValue = _purchaseRows.fold<double>(
+        0.0, (s, r) => s + _svc.toDouble(r['selling_price_value']));
+    final totalWholesaleValue = _purchaseRows.fold<double>(
+        0.0, (s, r) => s + _svc.toDouble(r['wholesale_price_value']));
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -706,14 +735,32 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                 children: [
                   _pill('Count', _purchaseRows.length.toString(), Colors.blue),
                   _pill('Total PKR', totalPkr.toStringAsFixed(2), Colors.green),
+                  _pill('Total USD', '\$${totalUsd.toStringAsFixed(2)}', Colors.teal),
+                  _pill('Total Coins', totalCoins.toStringAsFixed(2), Colors.purple),
                   _pill(
-                      'Total Coins', totalCoins.toStringAsFixed(2), Colors.purple),
-                  _pill(
-                    'Avg Cost/Coin',
-                    totalCoins > 0
-                        ? (totalPkr / totalCoins).toStringAsFixed(2)
-                        : '0',
+                    'Cost/Coin PKR',
+                    totalCoins > 0 ? (totalPkr / totalCoins).toStringAsFixed(2) : '0',
                     Colors.orange,
+                  ),
+                  _pill(
+                    'Selling Value',
+                    totalSellingValue.toStringAsFixed(2),
+                    Colors.indigo,
+                  ),
+                  _pill(
+                    'Wholesale Value',
+                    totalWholesaleValue.toStringAsFixed(2),
+                    Colors.deepPurple,
+                  ),
+                  _pill(
+                    'Profit (Selling)',
+                    (totalSellingValue - totalPkr).toStringAsFixed(2),
+                    (totalSellingValue - totalPkr) >= 0 ? Colors.green : Colors.red,
+                  ),
+                  _pill(
+                    'Profit (Wholesale)',
+                    (totalWholesaleValue - totalPkr).toStringAsFixed(2),
+                    (totalWholesaleValue - totalPkr) >= 0 ? Colors.green : Colors.red,
                   ),
                 ],
               ),
@@ -734,58 +781,98 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                   final payType = r['payment_type'] ?? 'cash';
                   final coins = _svc.toDouble(r['purchased_coins']);
                   final pkr = _svc.toDouble(r['amount_pkr']);
+                  final usd = _svc.toDouble(r['amount_usd']);
                   final costPerCoin = coins > 0 ? pkr / coins : 0;
                   final vendor = r['vendor_name'] ?? '';
                   final note = r['note'] ?? '';
 
-                  String subtitle = date.toString();
-                  if (vendor.isNotEmpty) subtitle += '\nVendor: $vendor';
+                  final sellingValue = _svc.toDouble(r['selling_price_value']);
+                  final wholesaleValue = _svc.toDouble(r['wholesale_price_value']);
+                  final perCoinRate = _svc.toDouble(r['applications']?['per_coin_rate']);
+                  final wholesaleRate = _svc.toDouble(r['applications']?['wholesale_rate']);
+
+                  String subtitle = date.toString().split('.')[0];
+                  if (vendor.isNotEmpty) subtitle += '\n👤 Vendor: $vendor';
+                  if (usd > 0) subtitle += '\n💵 USD: \$${usd.toStringAsFixed(2)}';
+
+                  if (perCoinRate > 0) {
+                    subtitle += '\n💰 Selling: PKR ${sellingValue.toStringAsFixed(2)} (@${perCoinRate.toStringAsFixed(2)} coins/PKR)';
+                  }
+                  if (wholesaleRate > 0) {
+                    subtitle += '\n📦 Wholesale: PKR ${wholesaleValue.toStringAsFixed(2)} (@${wholesaleRate.toStringAsFixed(2)} coins/PKR)';
+                  }
+
                   if (payType == 'mix') {
                     final cash = _svc.toDouble(r['cash_amount']);
                     final bank = _svc.toDouble(r['bank_amount']);
                     subtitle +=
-                    '\nCash: ${cash.toStringAsFixed(2)} • Bank: ${bank.toStringAsFixed(2)}';
+                    '\n💸 Cash: ${cash.toStringAsFixed(2)} • 🏦 Bank: ${bank.toStringAsFixed(2)}';
                   } else if (payType == 'bank' &&
                       (r['bank_accounts']?['bank_name'] ?? '').isNotEmpty) {
                     final bank = r['bank_accounts']?['bank_name'] ?? '';
                     final acc = r['bank_accounts']?['account_number'] ?? '';
-                    subtitle += '\n$bank • $acc';
+                    subtitle += '\n🏦 $bank • $acc';
                   }
-                  if (note.isNotEmpty) subtitle += '\n$note';
+                  if (note.isNotEmpty) subtitle += '\n📝 $note';
 
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.withOpacity(0.12),
-                      child: Text(payType[0].toUpperCase()),
-                    ),
-                    title: Text(
-                      '$appName • $payType',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(subtitle),
-                    isThreeLine: true,
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'PKR ${pkr.toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        Text(
-                          '${coins.toStringAsFixed(2)} coins',
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    elevation: 1,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: CircleAvatar(
+                        backgroundColor: payType == 'cash'
+                            ? Colors.green.withOpacity(0.2)
+                            : payType == 'bank'
+                            ? Colors.blue.withOpacity(0.2)
+                            : Colors.purple.withOpacity(0.2),
+                        child: Text(
+                          payType[0].toUpperCase(),
                           style: TextStyle(
-                              fontSize: 11, color: Colors.grey[700]),
+                            fontWeight: FontWeight.bold,
+                            color: payType == 'cash'
+                                ? Colors.green
+                                : payType == 'bank'
+                                ? Colors.blue
+                                : Colors.purple,
+                          ),
                         ),
-                        Text(
-                          '${costPerCoin.toStringAsFixed(2)}/coin',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                      ),
+                      title: Text(
+                        '$appName • ${payType.toUpperCase()}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      isThreeLine: true,
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'PKR ${pkr.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: Colors.green,
+                            ),
+                          ),
+                          Text(
+                            '${coins.toStringAsFixed(2)} coins',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[700]),
+                          ),
+                          Text(
+                            '${costPerCoin.toStringAsFixed(2)}/coin',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }),
