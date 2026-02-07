@@ -32,10 +32,10 @@ class _InventoryManagementState extends State<InventoryManagement> {
   Map<String, dynamic> _statistics = {};
 
   // ✅ New top summary totals
-  double _sumStandardValue = 0.0;   // Σ (coins ÷ perCoinRate)
-  double _sumWholesaleValue = 0.0;  // Σ (coins ÷ wholesaleRate)
-  double _sumCustomerCredit = 0.0;  // Σ customer_applications.total_credit
-  double _sumPreviousCredit = 0.0;  // Σ applications.previous_credit
+  double _sumStandardValue = 0.0; // Σ (coins ÷ perCoinRate)
+  double _sumWholesaleValue = 0.0; // Σ (coins ÷ wholesaleRate)
+  double _sumCustomerCredit = 0.0; // Σ customer_applications.total_credit
+  double _sumPreviousCredit = 0.0; // Σ applications.previous_credit
 
   @override
   void initState() {
@@ -66,22 +66,17 @@ class _InventoryManagementState extends State<InventoryManagement> {
       double allCustomerCredit = 0.0;
 
       try {
-        final customers = await _customerService.getCustomers();
-        for (var customer in customers) {
-          try {
-            final customerApps = await _customerService.getCustomerApplications(customer.id);
-            for (var customerApp in customerApps) {
-              final int appId = (customerApp['application_id'] as num).toInt();
-              final double credit = (customerApp['total_credit'] as num).toDouble();
-              appCredits[appId] = (appCredits[appId] ?? 0.0) + credit;
-              allCustomerCredit += credit;
-            }
-          } catch (e) {
-            // ignore per-customer failures
-          }
+        // OPTIMIZED: Fetch all customer applications in ONE query instead of 70+ queries
+        final allCustomerApps = await _customerService
+            .getAllCustomerApplications();
+        for (var customerApp in allCustomerApps) {
+          final int appId = (customerApp['application_id'] as num).toInt();
+          final double credit = (customerApp['total_credit'] as num).toDouble();
+          appCredits[appId] = (appCredits[appId] ?? 0.0) + credit;
+          allCustomerCredit += credit;
         }
       } catch (e) {
-        // ignore
+        debugPrint('⚠️ Error fetching customer credits: $e');
       }
 
       // ✅ 2) inventory value totals - CORRECTED TO DIVISION
@@ -114,6 +109,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
       });
     } catch (e) {
       if (mounted) {
+        debugPrint('❌ Inventory fetch error: $e');
         _showSnackBar('Error: ${e.toString()}', Colors.red);
       }
       setState(() => _isLoading = false);
@@ -137,9 +133,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
       _filteredApplications = _applications;
     } else {
       _filteredApplications = _applications
-          .where((app) =>
-      app.applicationName.toLowerCase().contains(_searchQuery) ||
-          app.id.toString().contains(_searchQuery))
+          .where(
+            (app) =>
+                app.applicationName.toLowerCase().contains(_searchQuery) ||
+                app.id.toString().contains(_searchQuery),
+          )
           .toList();
     }
     setState(() {});
@@ -187,13 +185,13 @@ class _InventoryManagementState extends State<InventoryManagement> {
   }
 
   Future<void> _updateApplication(
-      ApplicationModel app,
-      double prevCredit,
-      double newCredit,
-      double totalCoins,
-      double perCoinRate,
-      double wholesaleRate,
-      ) async {
+    ApplicationModel app,
+    double prevCredit,
+    double newCredit,
+    double totalCoins,
+    double perCoinRate,
+    double wholesaleRate,
+  ) async {
     try {
       await _inventoryService.updateApplication(
         id: app.id,
@@ -326,17 +324,22 @@ class _InventoryManagementState extends State<InventoryManagement> {
                     ),
                     child: _isAdding
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
                         : const Text(
-                      'Add Application',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+                            'Add Application',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -349,11 +352,21 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
   void _showEditDialog(ApplicationModel app) {
     final nameController = TextEditingController(text: app.applicationName);
-    final prevCreditController = TextEditingController(text: app.previousCredit.toString());
-    final newCreditController = TextEditingController(text: app.newCredit.toString());
-    final totalCoinsController = TextEditingController(text: app.totalCoins.toString());
-    final perCoinRateController = TextEditingController(text: app.perCoinRate.toString());
-    final wholesaleRateController = TextEditingController(text: app.wholesaleRate.toString());
+    final prevCreditController = TextEditingController(
+      text: app.previousCredit.toString(),
+    );
+    final newCreditController = TextEditingController(
+      text: app.newCredit.toString(),
+    );
+    final totalCoinsController = TextEditingController(
+      text: app.totalCoins.toString(),
+    );
+    final perCoinRateController = TextEditingController(
+      text: app.perCoinRate.toString(),
+    );
+    final wholesaleRateController = TextEditingController(
+      text: app.wholesaleRate.toString(),
+    );
 
     showDialog(
       context: context,
@@ -371,7 +384,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   children: [
                     const Text(
                       'Edit Application',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
@@ -437,7 +454,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           backgroundColor: Colors.grey[300],
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text('Cancel'),
                       ),
@@ -459,7 +478,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text('Save'),
                       ),
@@ -480,305 +501,421 @@ class _InventoryManagementState extends State<InventoryManagement> {
       backgroundColor: Colors.grey[50],
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-        ),
-      )
-          : Column(
-        children: [
-          // Header
-          Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.85,
-              margin: const EdgeInsets.only(top: 16, left: 16, right: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Inventory Management',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_applications.length} Applications',
-                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ✅ Top 4 summary cards
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _statisticsCard(
-                    label: 'Total Std Value',
-                    value: _sumStandardValue.toStringAsFixed(2),
-                    icon: Icons.trending_up,
-                    color: Colors.teal,
-                  ),
-                  const SizedBox(width: 12),
-                  _statisticsCard(
-                    label: 'Total Wholesale Value',
-                    value: _sumWholesaleValue.toStringAsFixed(2),
-                    icon: Icons.local_offer,
-                    color: Colors.deepPurple,
-                  ),
-                  const SizedBox(width: 12),
-                  _statisticsCard(
-                    label: 'Customers Total Credit',
-                    value: _sumCustomerCredit.toStringAsFixed(2),
-                    icon: Icons.people,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(width: 12),
-                  _statisticsCard(
-                    label: 'Previous Credit Total',
-                    value: _sumPreviousCredit.toStringAsFixed(2),
-                    icon: Icons.payments,
-                    color: Colors.green,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search applications...',
-                prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.blue, width: 1),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.blue, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          Expanded(
-            child: _filteredApplications.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inventory_2, size: 64, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    _searchQuery.isEmpty ? 'No applications yet' : 'No applications found',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
               ),
             )
-                : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _filteredApplications.length,
-              itemBuilder: (context, index) {
-                final app = _filteredApplications[index];
-
-                // ✅ CORRECTED: Division instead of multiplication
-                final stockValue = app.perCoinRate > 0
-                    ? (app.totalCoins / app.perCoinRate)
-                    : 0.0;
-
-                final standardValue = app.perCoinRate > 0
-                    ? (app.totalCoins / app.perCoinRate)
-                    : 0.0;
-
-                final wholesaleValue = app.wholesaleRate > 0
-                    ? (app.totalCoins / app.wholesaleRate)
-                    : 0.0;
-
-                final customerTotalCredit = _appCustomerCredits[app.id] ?? 0.0;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          : Column(
+              children: [
+                // Header
+                Center(
                   child: Container(
+                    width: MediaQuery.of(context).size.width * 0.85,
+                    margin: const EdgeInsets.only(top: 16, left: 16, right: 16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border(
-                        left: BorderSide(color: Colors.green[700]!, width: 5),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  app.applicationName,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              PopupMenuButton(
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.edit, color: Colors.blue),
-                                        SizedBox(width: 8),
-                                        Text('Edit'),
-                                      ],
-                                    ),
-                                    onTap: () {
-                                      Future.delayed(const Duration(milliseconds: 200), () => _showEditDialog(app));
-                                    },
-                                  ),
-                                  PopupMenuItem(
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.delete, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Delete'),
-                                      ],
-                                    ),
-                                    onTap: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Delete Application'),
-                                          content: const Text('Are you sure you want to delete this application?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () {
-                                                _deleteApplication(app.id);
-                                                Navigator.pop(context);
-                                              },
-                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Inventory Management',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-
-                          const SizedBox(height: 12),
-                          const Divider(height: 1, color: Colors.grey),
-                          const SizedBox(height: 12),
-
-                          // ✅ Table with corrected calculations
-                          Table(
-                            border: TableBorder(
-                              horizontalInside: BorderSide(color: Colors.grey[300]!, width: 1),
-                              bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                            ),
-                            columnWidths: const {
-                              0: FlexColumnWidth(1.5),
-                              1: FlexColumnWidth(1.5),
-                              2: FlexColumnWidth(1.5),
-                              3: FlexColumnWidth(1.5),
-                            },
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.grey[200]),
-                                children: [
-                                  _tableCell('Previous\nCredit', true),
-                                  _tableCell('Customer\nTotal Credit', true),
-                                  _tableCell('Total\nCoins', true),
-                                  _tableCell('Stock\nValue', true),
-                                ],
-                              ),
-                              TableRow(
-                                children: [
-                                  _tableCell(app.previousCredit.toStringAsFixed(2), false, Colors.green),
-                                  _tableCell(customerTotalCredit.toStringAsFixed(2), false, Colors.deepPurple),
-                                  _tableCell(app.totalCoins.toStringAsFixed(2), false, Colors.orange),
-                                  _tableCell(stockValue.toStringAsFixed(2), false, Colors.teal),
-                                ],
-                              ),
-
-                              // ✅ CORRECTED: Show division formula
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.grey[200]),
-                                children: [
-                                  _tableCell('Coins ÷\nRate', true),
-                                  _tableCell('Std\nValue', true),
-                                  _tableCell('Coins ÷\nWholesale', true),
-                                  _tableCell('Wholesale\nValue', true),
-                                ],
-                              ),
-                              TableRow(
-                                children: [
-                                  _tableCell(
-                                    '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.perCoinRate.toStringAsFixed(4)}',
-                                    false,
-                                    Colors.purple,
-                                  ),
-                                  _tableCell(standardValue.toStringAsFixed(2), false, Colors.teal),
-                                  _tableCell(
-                                    '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.wholesaleRate.toStringAsFixed(4)}',
-                                    false,
-                                    Colors.indigo,
-                                  ),
-                                  _tableCell(wholesaleValue.toStringAsFixed(2), false, Colors.red),
-                                ],
-                              ),
-                            ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_applications.length} Applications',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.9),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
+                ),
+
+                const SizedBox(height: 16),
+
+                // ✅ Top 4 summary cards
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _statisticsCard(
+                          label: 'Total Std Value',
+                          value: _sumStandardValue.toStringAsFixed(2),
+                          icon: Icons.trending_up,
+                          color: Colors.teal,
+                        ),
+                        const SizedBox(width: 12),
+                        _statisticsCard(
+                          label: 'Total Wholesale Value',
+                          value: _sumWholesaleValue.toStringAsFixed(2),
+                          icon: Icons.local_offer,
+                          color: Colors.deepPurple,
+                        ),
+                        const SizedBox(width: 12),
+                        _statisticsCard(
+                          label: 'Customers Total Credit',
+                          value: _sumCustomerCredit.toStringAsFixed(2),
+                          icon: Icons.people,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 12),
+                        _statisticsCard(
+                          label: 'Previous Credit Total',
+                          value: _sumPreviousCredit.toStringAsFixed(2),
+                          icon: Icons.payments,
+                          color: Colors.green,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search applications...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                Expanded(
+                  child: _filteredApplications.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inventory_2,
+                                size: 64,
+                                color: Colors.grey[300],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isEmpty
+                                    ? 'No applications yet'
+                                    : 'No applications found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: _filteredApplications.length,
+                          itemBuilder: (context, index) {
+                            final app = _filteredApplications[index];
+
+                            // ✅ CORRECTED: Division instead of multiplication
+                            final stockValue = app.perCoinRate > 0
+                                ? (app.totalCoins / app.perCoinRate)
+                                : 0.0;
+
+                            final standardValue = app.perCoinRate > 0
+                                ? (app.totalCoins / app.perCoinRate)
+                                : 0.0;
+
+                            final wholesaleValue = app.wholesaleRate > 0
+                                ? (app.totalCoins / app.wholesaleRate)
+                                : 0.0;
+
+                            final customerTotalCredit =
+                                _appCustomerCredits[app.id] ?? 0.0;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: Colors.green[700]!,
+                                      width: 5,
+                                    ),
+                                  ),
+                                  color: Colors.white,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              app.applicationName,
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          PopupMenuButton(
+                                            itemBuilder: (context) => [
+                                              PopupMenuItem(
+                                                child: const Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.edit,
+                                                      color: Colors.blue,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text('Edit'),
+                                                  ],
+                                                ),
+                                                onTap: () {
+                                                  Future.delayed(
+                                                    const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    () => _showEditDialog(app),
+                                                  );
+                                                },
+                                              ),
+                                              PopupMenuItem(
+                                                child: const Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.delete,
+                                                      color: Colors.red,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text('Delete'),
+                                                  ],
+                                                ),
+                                                onTap: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      title: const Text(
+                                                        'Delete Application',
+                                                      ),
+                                                      content: const Text(
+                                                        'Are you sure you want to delete this application?',
+                                                      ),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                context,
+                                                              ),
+                                                          child: const Text(
+                                                            'Cancel',
+                                                          ),
+                                                        ),
+                                                        TextButton(
+                                                          onPressed: () {
+                                                            _deleteApplication(
+                                                              app.id,
+                                                            );
+                                                            Navigator.pop(
+                                                              context,
+                                                            );
+                                                          },
+                                                          child: const Text(
+                                                            'Delete',
+                                                            style: TextStyle(
+                                                              color: Colors.red,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 12),
+                                      const Divider(
+                                        height: 1,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(height: 12),
+
+                                      // ✅ Table with corrected calculations
+                                      Table(
+                                        border: TableBorder(
+                                          horizontalInside: BorderSide(
+                                            color: Colors.grey[300]!,
+                                            width: 1,
+                                          ),
+                                          bottom: BorderSide(
+                                            color: Colors.grey[300]!,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        columnWidths: const {
+                                          0: FlexColumnWidth(1.5),
+                                          1: FlexColumnWidth(1.5),
+                                          2: FlexColumnWidth(1.5),
+                                          3: FlexColumnWidth(1.5),
+                                        },
+                                        children: [
+                                          TableRow(
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                            ),
+                                            children: [
+                                              _tableCell(
+                                                'Previous\nCredit',
+                                                true,
+                                              ),
+                                              _tableCell(
+                                                'Customer\nTotal Credit',
+                                                true,
+                                              ),
+                                              _tableCell('Total\nCoins', true),
+                                              _tableCell('Stock\nValue', true),
+                                            ],
+                                          ),
+                                          TableRow(
+                                            children: [
+                                              _tableCell(
+                                                app.previousCredit
+                                                    .toStringAsFixed(2),
+                                                false,
+                                                Colors.green,
+                                              ),
+                                              _tableCell(
+                                                customerTotalCredit
+                                                    .toStringAsFixed(2),
+                                                false,
+                                                Colors.deepPurple,
+                                              ),
+                                              _tableCell(
+                                                app.totalCoins.toStringAsFixed(
+                                                  2,
+                                                ),
+                                                false,
+                                                Colors.orange,
+                                              ),
+                                              _tableCell(
+                                                stockValue.toStringAsFixed(2),
+                                                false,
+                                                Colors.teal,
+                                              ),
+                                            ],
+                                          ),
+
+                                          // ✅ CORRECTED: Show division formula
+                                          TableRow(
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                            ),
+                                            children: [
+                                              _tableCell('Coins ÷\nRate', true),
+                                              _tableCell('Std\nValue', true),
+                                              _tableCell(
+                                                'Coins ÷\nWholesale',
+                                                true,
+                                              ),
+                                              _tableCell(
+                                                'Wholesale\nValue',
+                                                true,
+                                              ),
+                                            ],
+                                          ),
+                                          TableRow(
+                                            children: [
+                                              _tableCell(
+                                                '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.perCoinRate.toStringAsFixed(4)}',
+                                                false,
+                                                Colors.purple,
+                                              ),
+                                              _tableCell(
+                                                standardValue.toStringAsFixed(
+                                                  2,
+                                                ),
+                                                false,
+                                                Colors.teal,
+                                              ),
+                                              _tableCell(
+                                                '${app.totalCoins.toStringAsFixed(2)} ÷ ${app.wholesaleRate.toStringAsFixed(4)}',
+                                                false,
+                                                Colors.indigo,
+                                              ),
+                                              _tableCell(
+                                                wholesaleValue.toStringAsFixed(
+                                                  2,
+                                                ),
+                                                false,
+                                                Colors.red,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,
         backgroundColor: Colors.green[700],
@@ -815,8 +952,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
       controller: controller,
       keyboardType: isNumber
           ? (decimal
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.number)
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : TextInputType.number)
           : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
@@ -883,7 +1020,10 @@ class _InventoryManagementState extends State<InventoryManagement> {
             ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Colors.black54),
+          ),
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,6 +20,9 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
   Map<String, dynamic> _statistics = {};
   bool _isLoading = true;
   bool _isProcessing = false;
+  String? _lastLoadError;
+  int? _currentAdminId;
+  String? _currentAuthUserId;
 
   // Form controllers
   final _nameController = TextEditingController();
@@ -43,21 +47,57 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
 
   Future<void> _loadData() async {
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _lastLoadError = null;
+      });
 
-      final employees = await _employeeService.getEmployees();
-      final stats = await _employeeService.getEmployeeStatistics();
+      // On web, give the session a moment to attach (avoids first request without JWT).
+      if (kIsWeb) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        if (!mounted) return;
+      }
 
+      var employees = await _employeeService.getEmployees();
+      var stats = await _employeeService.getEmployeeStatistics();
+      var adminId = await _employeeService.getCurrentAdminIdOrNull();
+
+      // One retry on web if we got 0 employees but have valid admin (session may have attached late).
+      if (kIsWeb && employees.isEmpty && adminId != null) {
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        employees = await _employeeService.getEmployees();
+        stats = await _employeeService.getEmployeeStatistics();
+      }
+
+      if (!mounted) return;
       setState(() {
         _employees = employees;
         _statistics = stats;
+        _currentAdminId = adminId;
+        _currentAuthUserId = _employeeService.getCurrentAuthUserId();
         _isLoading = false;
       });
     } catch (e) {
+      final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       if (mounted) {
-        _showSnackBar('Error: ${e.toString()}', Colors.red);
+        _showSnackBar(
+          msg.contains('Not authenticated') || msg.contains('No admin or employee')
+              ? 'Could not load employees. $msg'
+              : 'Error loading employees: $msg',
+          Colors.red,
+        );
       }
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _employees = [];
+          _statistics = {};
+          _lastLoadError = msg;
+          _currentAdminId = null;
+          _currentAuthUserId = null;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -324,21 +364,113 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
           Expanded(
             child: _employees.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people,
-                      size: 64, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No employees yet',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.people,
+                        size: 64, color: Colors.grey[300]),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No employees yet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                    if (_lastLoadError != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Text(
+                          _lastLoadError!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red.shade800,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    if (_currentAdminId != null && _lastLoadError == null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Not CORS — requests return 200 OK; the API is returning empty data.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Your admin ID: $_currentAdminId',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      if (_currentAuthUserId != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Auth user ID: ${_currentAuthUserId!.length > 20 ? '${_currentAuthUserId!.substring(0, 20)}...' : _currentAuthUserId}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'In Supabase: Table admin must have a row with auth_id = this Auth user ID and id = $_currentAdminId. '
+                          'Table employees must have rows with admin_id = $_currentAdminId.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ] else ...[
+                        Text(
+                          'In Supabase, employees must have admin_id = $_currentAdminId.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 20),
+                    Text(
+                      'Use the same admin account as on your phone, then tap Retry.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _isLoading ? null : _loadData,
+                      icon: const Icon(Icons.refresh, size: 20),
+                      label: const Text('Retry'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
                 : ListView.builder(

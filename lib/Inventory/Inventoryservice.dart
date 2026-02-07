@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/network_utils.dart';
 
 // ============================================
 // APPLICATION MODEL
@@ -107,6 +109,8 @@ class InventoryService {
         throw Exception('User not authenticated');
       }
 
+      debugPrint('✅ User authenticated: ${user.id}');
+
       // Get admin ID from admin table using user's email or ID
       final response = await _supabase
           .from('admin')
@@ -114,41 +118,36 @@ class InventoryService {
           .eq('auth_id', user.id)
           .single();
 
+      debugPrint('✅ Admin ID retrieved: ${response['id']}');
       return response['id'] as int;
     } catch (e) {
+      debugPrint('❌ Error getting admin ID: $e');
       throw Exception('Error getting admin ID: $e');
     }
   }
 
-  // Get all applications for current admin
+  // Get all applications (for all admins)
   Future<List<ApplicationModel>> getApplications() async {
-    try {
-      final adminId = await _getAdminId();
-
+    return NetworkUtils.withRetry(() async {
       final response = await _supabase
           .from('applications')
           .select()
-          .eq('admin_id', adminId)
           .order('created_at', ascending: false);
 
+      debugPrint('✅ Applications fetched: ${(response as List).length} items');
       return (response as List)
           .map((item) => ApplicationModel.fromJson(item))
           .toList();
-    } catch (e) {
-      throw Exception('Error fetching applications: $e');
-    }
+    }, operationName: 'Fetch Applications');
   }
 
   // Get single application by ID
   Future<ApplicationModel> getApplicationById(int id) async {
     try {
-      final adminId = await _getAdminId();
-
       final response = await _supabase
           .from('applications')
           .select()
           .eq('id', id)
-          .eq('admin_id', adminId)
           .single();
 
       return ApplicationModel.fromJson(response);
@@ -191,14 +190,14 @@ class InventoryService {
       final response = await _supabase
           .from('applications')
           .insert({
-        'admin_id': adminId,
-        'application_name': applicationName.trim(),
-        'previous_credit': previousCredit,
-        'new_credit': 0,
-        'total_coins': totalCoins,
-        'per_coin_rate': perCoinRate,
-        'wholesale_rate': wholesaleRate,
-      })
+            'admin_id': adminId,
+            'application_name': applicationName.trim(),
+            'previous_credit': previousCredit,
+            'new_credit': 0,
+            'total_coins': totalCoins,
+            'per_coin_rate': perCoinRate,
+            'wholesale_rate': wholesaleRate,
+          })
           .select()
           .single();
 

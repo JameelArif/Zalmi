@@ -28,13 +28,13 @@ class EmployeeModel {
 
   factory EmployeeModel.fromJson(Map<String, dynamic> json) {
     return EmployeeModel(
-      id: json['id'] as int,
-      adminId: json['admin_id'] as int,
-      name: json['name'] as String,
-      email: json['email'] as String,
-      contact: json['contact'] as String,
-      authId: json['auth_id'] as String,
-      status: json['status'] as String,
+      id: (json['id'] as num).toInt(),
+      adminId: (json['admin_id'] as num).toInt(),
+      name: (json['name'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      contact: (json['contact'] ?? '').toString(),
+      authId: (json['auth_id'] ?? '').toString(),
+      status: (json['status'] ?? 'active').toString(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -111,24 +111,58 @@ class EmployeeAppModel {
 class EmployeeService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Get current admin ID
+  // Get current admin ID (same logic as cutsomer_addition: try employee then admin)
   Future<int> _getAdminId() async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
-        throw Exception('User not authenticated');
+        throw Exception('Not authenticated. Please log in again.');
       }
 
-      final response = await _supabase
+      // If logged in as employee, use their admin_id so web and phone behave the same
+      final empRow = await _supabase
+          .from('employees')
+          .select('admin_id')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+
+      if (empRow != null) {
+        return (empRow['admin_id'] as num).toInt();
+      }
+
+      // Otherwise treat as admin
+      final adminRow = await _supabase
           .from('admin')
           .select('id')
           .eq('auth_id', user.id)
-          .single();
+          .maybeSingle();
 
-      return response['id'] as int;
+      if (adminRow != null) {
+        return (adminRow['id'] as num).toInt();
+      }
+
+      throw Exception(
+        'No admin or employee record found for this account. '
+        'On web, ensure you are logged in with the same admin account used on the phone.',
+      );
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('Error getting admin ID: $e');
     }
+  }
+
+  /// Returns current admin/employee context ID or null (for debugging empty lists).
+  Future<int?> getCurrentAdminIdOrNull() async {
+    try {
+      return await _getAdminId();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns current auth.uid() (for debugging: compare with admin.auth_id in Supabase).
+  String? getCurrentAuthUserId() {
+    return _supabase.auth.currentUser?.id;
   }
 
   // Register and create employee
@@ -173,13 +207,13 @@ class EmployeeService {
       final response = await _supabase
           .from('employees')
           .insert({
-        'admin_id': adminId,
-        'name': name.trim(),
-        'email': email.trim(),
-        'contact': contact.trim(),
-        'auth_id': userId,
-        'status': 'active',
-      })
+            'admin_id': adminId,
+            'name': name.trim(),
+            'email': email.trim(),
+            'contact': contact.trim(),
+            'auth_id': userId,
+            'status': 'active',
+          })
           .select()
           .single();
 
@@ -190,35 +224,41 @@ class EmployeeService {
     }
   }
 
-  // Get all employees
+  // Get all employees (for all admins)
   Future<List<EmployeeModel>> getEmployees() async {
     try {
-      final adminId = await _getAdminId();
-
       final response = await _supabase
           .from('employees')
           .select()
-          .eq('admin_id', adminId)
           .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((item) => EmployeeModel.fromJson(item))
+      final List<dynamic> rawList = _normalizeListResponse(response);
+      return rawList
+          .map((item) => EmployeeModel.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw Exception('Error fetching employees: $e');
     }
   }
 
+  /// Handles Supabase response: can be List or Map with 'data' key (platform-dependent).
+  List<dynamic> _normalizeListResponse(dynamic response) {
+    if (response == null) return [];
+    if (response is List) return response;
+    if (response is Map && response.containsKey('data')) {
+      final data = response['data'];
+      return data is List ? data : [];
+    }
+    return [];
+  }
+
   // Get single employee
   Future<EmployeeModel> getEmployee(int id) async {
     try {
-      final adminId = await _getAdminId();
-
       final response = await _supabase
           .from('employees')
           .select()
           .eq('id', id)
-          .eq('admin_id', adminId)
           .single();
 
       final jsonData = response is List ? response[0] : response;
@@ -314,11 +354,11 @@ class EmployeeService {
       final response = await _supabase
           .from('employee_applications')
           .insert({
-        'employee_id': employeeId,
-        'application_id': applicationId,
-        'application_name': applicationName,
-        'assigned_date': DateTime.now().toIso8601String(),
-      })
+            'employee_id': employeeId,
+            'application_id': applicationId,
+            'application_name': applicationName,
+            'assigned_date': DateTime.now().toIso8601String(),
+          })
           .select()
           .single();
 
@@ -361,7 +401,6 @@ class EmployeeService {
   // Get employee statistics
   Future<Map<String, dynamic>> getEmployeeStatistics() async {
     try {
-      final adminId = await _getAdminId();
       final employees = await getEmployees();
 
       int activeCount = 0;
@@ -394,10 +433,7 @@ class EmployeeService {
   Future<EmployeeModel> toggleEmployeeStatus(EmployeeModel employee) async {
     try {
       final newStatus = employee.status == 'active' ? 'inactive' : 'active';
-      return await updateEmployee(
-        id: employee.id,
-        status: newStatus,
-      );
+      return await updateEmployee(id: employee.id, status: newStatus);
     } catch (e) {
       throw Exception('Error toggling status: $e');
     }

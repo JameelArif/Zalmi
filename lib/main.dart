@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io' show Platform;
 
+import 'config/supabase_config.dart';
 import 'Homeshell.dart';
 import 'Prevoius code/Login/authservice.dart';
 import 'Prevoius code/Login/loginscreen.dart';
@@ -8,11 +10,12 @@ import 'Prevoius code/Login/loginscreen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: 'https://dezwlrpyvweynxipnsyp.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlendscnB5dndleW54aXBuc3lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MjUyNjIsImV4cCI6MjA4NTIwMTI2Mn0.5Bkkqp_7ytgSWzKdlOi26fP4YB5P7xliV5L88drxL4Y',
-  );
+  try {
+    // Initialize Supabase with proper configuration
+    await SupabaseConfig.initialize();
+  } catch (e) {
+    debugPrint('❌ Failed to initialize Supabase: $e');
+  }
 
   runApp(const MyApp());
 }
@@ -77,32 +80,20 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.shopping_bag,
-              size: 64,
-              color: Colors.blue,
-            ),
+            const Icon(Icons.shopping_bag, size: 64, color: Colors.blue),
             const SizedBox(height: 24),
             const Text(
               'Zalmi Reseller',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
               'Admin Portal',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 32),
             CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.blue.shade400,
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade400),
             ),
           ],
         ),

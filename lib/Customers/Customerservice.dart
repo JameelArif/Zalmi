@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/network_utils.dart';
 
 // ============================================
 // CUSTOMER MODEL
@@ -32,10 +34,7 @@ class CustomerModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'customer_name': customerName,
-      'customer_contact': customerContact,
-    };
+    return {'customer_name': customerName, 'customer_contact': customerContact};
   }
 
   CustomerModel copyWith({
@@ -130,18 +129,19 @@ class CustomerService {
   // Get all customers for current admin
   Future<List<CustomerModel>> getCustomers() async {
     try {
-      final adminId = await _getAdminId();
+      debugPrint('🔄 Fetching customers...');
 
       final response = await _supabase
           .from('customers')
           .select()
-          .eq('admin_id', adminId)
           .order('created_at', ascending: false);
 
+      debugPrint('✅ Customers fetched: ${(response as List).length} items');
       return (response as List)
           .map((item) => CustomerModel.fromJson(item))
           .toList();
     } catch (e) {
+      debugPrint('❌ Error fetching customers: $e');
       throw Exception('Error fetching customers: $e');
     }
   }
@@ -188,10 +188,10 @@ class CustomerService {
       final response = await _supabase
           .from('customers')
           .insert({
-        'admin_id': adminId,
-        'customer_name': customerName.trim(),
-        'customer_contact': customerContact.trim(),
-      })
+            'admin_id': adminId,
+            'customer_name': customerName.trim(),
+            'customer_contact': customerContact.trim(),
+          })
           .select()
           .single();
 
@@ -299,10 +299,10 @@ class CustomerService {
       final response = await _supabase
           .from('customer_applications')
           .insert({
-        'customer_id': customerId,
-        'application_id': applicationId,
-        'total_credit': totalCredit,
-      })
+            'customer_id': customerId,
+            'application_id': applicationId,
+            'total_credit': totalCredit,
+          })
           .select()
           .single();
 
@@ -313,11 +313,15 @@ class CustomerService {
   }
 
   // Get customer applications
-  Future<List<Map<String, dynamic>>> getCustomerApplications(int customerId) async {
+  Future<List<Map<String, dynamic>>> getCustomerApplications(
+    int customerId,
+  ) async {
     try {
       final response = await _supabase
           .from('customer_applications')
-          .select('*, applications(application_name, per_coin_rate, wholesale_rate)')
+          .select(
+            '*, applications(application_name, per_coin_rate, wholesale_rate)',
+          )
           .eq('customer_id', customerId)
           .order('created_at', ascending: false);
 
@@ -327,6 +331,23 @@ class CustomerService {
     }
   }
 
+
+  // ? OPTIMIZED: Get ALL customer applications in one query (not per-customer)
+  Future<List<Map<String, dynamic>>> getAllCustomerApplications() async {
+    try {
+      debugPrint('?? Fetching all customer applications...');
+      final response = await _supabase
+          .from('customer_applications')
+          .select('application_id, total_credit')
+          .order('created_at', ascending: false);
+
+      debugPrint('? All customer applications fetched: ${(response as List).length} items');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('? Error fetching all customer applications: $e');
+      throw Exception('Error fetching all customer applications: $e');
+    }
+  }
   // Update customer application credit
   Future<void> updateCustomerApplicationCredit({
     required int customerAppId,
@@ -363,11 +384,10 @@ class CustomerService {
     try {
       final customers = await getCustomers();
 
-      return {
-        'totalCustomers': customers.length,
-      };
+      return {'totalCustomers': customers.length};
     } catch (e) {
       throw Exception('Error getting statistics: $e');
     }
   }
 }
+
