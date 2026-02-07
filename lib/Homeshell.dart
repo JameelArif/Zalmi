@@ -171,30 +171,42 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ),
 
-      // ✅ Updated IndexedStack: Purchases page added
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          const AdminDashboardPage(), // Dashboard
-          const InventoryManagement(),                    // Inventory
-          const BulkCustomerImportPage(), // Profile
-
-          const AdminSalesPage(),                         // Sales
-          const AdminSalesApprovalScreen(),               // Approvals
-          const EmployeeManagement(),                     // Employee
-          const BankAccountManagement(),                  // Bank Accounts
-
-         const ExpensesManagement(), // Expenses
-          _buildPlaceholder(_menuItems[8], _menuIcons[8]), // Profits
-          const CustomerManagement(),                     // Customers
-
-          // ✅ Purchases (NEW - connected page)
-          const AdminPurchasesPage(),
-
-          _buildPlaceholder(_menuItems[11], _menuIcons[11]), // Gifting & Rewards
-        ],
-      ),
+      // Build only the selected screen to avoid "too much load on main thread".
+      // IndexedStack used to build all 12 screens at once, causing heavy main-thread work.
+      body: _buildBody(),
     );
+  }
+
+  /// Returns only the currently selected screen to reduce main-thread load.
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return const AdminDashboardPage();
+      case 1:
+        return const InventoryManagement();
+      case 2:
+        return const BulkCustomerImportPage();
+      case 3:
+        return const AdminSalesPage();
+      case 4:
+        return const AdminSalesApprovalScreen();
+      case 5:
+        return const EmployeeManagement();
+      case 6:
+        return const BankAccountManagement();
+      case 7:
+        return const ExpensesManagement();
+      case 8:
+        return _buildPlaceholder(_menuItems[8], _menuIcons[8]);
+      case 9:
+        return const CustomerManagement();
+      case 10:
+        return const AdminPurchasesPage();
+      case 11:
+        return _buildPlaceholder(_menuItems[11], _menuIcons[11]);
+      default:
+        return const AdminDashboardPage();
+    }
   }
 
   Widget _buildPlaceholder(String title, IconData icon) {
