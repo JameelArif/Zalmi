@@ -148,7 +148,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                 children: [
                   // 1) Application
                   DropdownButtonFormField<int>(
-                    value: selectedAppId,
+                    initialValue: selectedAppId,
                     items: _apps
                         .map((a) => DropdownMenuItem<int>(
                       value: _svc.toInt(a['id']),
@@ -209,7 +209,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
 
                   // 4) Payment Type
                   DropdownButtonFormField<String>(
-                    value: selectedPaymentType,
+                    initialValue: selectedPaymentType,
                     items: const [
                       DropdownMenuItem(value: 'cash', child: Text('Cash')),
                       DropdownMenuItem(value: 'bank', child: Text('Bank')),
@@ -237,7 +237,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
                       )
                     else
                       DropdownButtonFormField<int>(
-                        value: selectedBankId,
+                        initialValue: selectedBankId,
                         items: _banks
                             .map((b) => DropdownMenuItem<int>(
                           value: _svc.toInt(b['id']),
@@ -602,7 +602,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
 
             // Application filter
             DropdownButtonFormField<int?>(
-              value: _filterAppId,
+              initialValue: _filterAppId,
               items: [
                 const DropdownMenuItem<int?>(
                   value: null,
@@ -623,7 +623,7 @@ class _AdminPurchasesPageState extends State<AdminPurchasesPage> {
 
             // Payment type filter
             DropdownButtonFormField<String>(
-              value: _filterPaymentType,
+              initialValue: _filterPaymentType,
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('All Payments')),
                 DropdownMenuItem(value: 'cash', child: Text('Cash')),

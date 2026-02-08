@@ -105,7 +105,7 @@ class ExpensesService {
         .select()
         .single();
 
-    return ExpenseCategory.fromJson(res as Map<String, dynamic>);
+    return ExpenseCategory.fromJson(res);
   }
 
   Future<void> deleteCategory(int id) async {

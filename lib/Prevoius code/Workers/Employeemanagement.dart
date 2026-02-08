@@ -208,7 +208,7 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
                         boxShadow: [BoxShadow(color: Colors.grey[200]!, blurRadius: 4, offset: const Offset(0, 2))],
                       ),
                       child: DataTable(
-                        headingRowColor: MaterialStateColor.resolveWith((_) => Colors.blue[100]!),
+                        headingRowColor: WidgetStateColor.resolveWith((_) => Colors.blue[100]!),
                         dataRowHeight: 70,
                         columns: const [
                           DataColumn(label: SizedBox(width: 140, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
@@ -302,7 +302,7 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
                           boxShadow: [BoxShadow(color: Colors.grey[200]!, blurRadius: 4, offset: const Offset(0, 2))],
                         ),
                         child: DataTable(
-                          headingRowColor: MaterialStateColor.resolveWith((_) => Colors.purple[100]!),
+                          headingRowColor: WidgetStateColor.resolveWith((_) => Colors.purple[100]!),
                           dataRowHeight: 65,
                           columns: const [
                             DataColumn(label: SizedBox(width: 140, child: Text('Employee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
@@ -544,7 +544,7 @@ class _AppAssignmentDialogState extends State<AppAssignmentDialog> {
               Text('All apps already assigned', style: TextStyle(fontSize: 11, color: Colors.grey[600]))
             else
               DropdownButtonFormField<int>(
-                value: selectedAppId,
+                initialValue: selectedAppId,
                 decoration: InputDecoration(
                   labelText: 'Select App',
                   prefixIcon: const Icon(Icons.apps, color: Colors.blue),

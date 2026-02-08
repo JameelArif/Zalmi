@@ -799,7 +799,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                         ),
-                        value: _selectedAppId,
+                        initialValue: _selectedAppId,
                         isExpanded: true,
                         onChanged: (value) {
                           setState(() => _selectedAppId = value);
@@ -1452,6 +1452,7 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                   PopupMenuButton(
                     itemBuilder: (context) => [
                       PopupMenuItem(
+                        onTap: widget.onToggleStatus,
                         child: Row(
                           children: [
                             Icon(
@@ -1467,9 +1468,9 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                                 widget.isActive ? 'Deactivate' : 'Activate'),
                           ],
                         ),
-                        onTap: widget.onToggleStatus,
                       ),
                       PopupMenuItem(
+                        onTap: widget.onDelete,
                         child: const Row(
                           children: [
                             Icon(Icons.delete, color: Colors.red),
@@ -1477,7 +1478,6 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                             Text('Delete'),
                           ],
                         ),
-                        onTap: widget.onDelete,
                       ),
                     ],
                   ),

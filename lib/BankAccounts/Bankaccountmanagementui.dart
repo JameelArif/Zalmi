@@ -19,7 +19,7 @@ class _BankAccountManagementState extends State<BankAccountManagement> {
 
   bool _isLoading = true;
   bool _isProcessing = false;
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   // Form controllers
   final _bankNameController = TextEditingController();
@@ -39,7 +39,7 @@ class _BankAccountManagementState extends State<BankAccountManagement> {
   // Filter variables
   DateTime? _filterFromDate;
   DateTime? _filterToDate;
-  String _filterTransactionType = 'All';
+  final String _filterTransactionType = 'All';
 
   @override
   void initState() {
@@ -793,7 +793,7 @@ class _BankAccountManagementState extends State<BankAccountManagement> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                         ),
-                        value: selectedFromAccount,
+                        initialValue: selectedFromAccount,
                         isExpanded: true,
                         onChanged: (value) {
                           setState(() => selectedFromAccount = value);
@@ -825,7 +825,7 @@ class _BankAccountManagementState extends State<BankAccountManagement> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                         ),
-                        value: selectedToAccount,
+                        initialValue: selectedToAccount,
                         isExpanded: true,
                         onChanged: (value) {
                           setState(() => selectedToAccount = value);

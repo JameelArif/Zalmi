@@ -104,7 +104,9 @@ class _ExpensesManagementState extends State<ExpensesManagement> {
     // sort keys
     final keys = m.keys.toList()..sort();
     final sorted = <String, double>{};
-    for (final k in keys) sorted[k] = m[k]!;
+    for (final k in keys) {
+      sorted[k] = m[k]!;
+    }
     return sorted;
   }
 
@@ -275,7 +277,7 @@ class _ExpensesManagementState extends State<ExpensesManagement> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<int?>(
-              value: _categoryId,
+              initialValue: _categoryId,
               items: [
                 const DropdownMenuItem(value: null, child: Text("All Categories")),
                 ..._categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
@@ -389,7 +391,7 @@ class _ExpensesManagementState extends State<ExpensesManagement> {
             const Text("Add Expense", style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
             DropdownButtonFormField<ExpenseCategory>(
-              value: _selectedCat,
+              initialValue: _selectedCat,
               items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
               onChanged: (v) => setState(() => _selectedCat = v),
               decoration: const InputDecoration(border: OutlineInputBorder(), labelText: "Category"),

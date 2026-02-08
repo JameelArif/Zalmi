@@ -1302,7 +1302,7 @@ class _CustomerManagementState extends State<CustomerManagement> {
                                                 ],
                                               ),
                                             );
-                                          }).toList(),
+                                          }),
                                         ],
                                       ),
                                     ),
@@ -1441,7 +1441,7 @@ class _AddAppDialogWithNotifierState extends State<_AddAppDialogWithNotifier> {
                         const BorderSide(color: Colors.blue, width: 2),
                       ),
                     ),
-                    value: selectedAppId,
+                    initialValue: selectedAppId,
                     onChanged: (value) {
                       appIdNotifier.value = value;
                     },

@@ -235,7 +235,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                     ],
                   ),
                   child: DataTable(
-                    headingRowColor: MaterialStateColor.resolveWith((_) => Colors.blue[100]!),
+                    headingRowColor: WidgetStateColor.resolveWith((_) => Colors.blue[100]!),
                     dataRowHeight: 60,
                     columns: const [
                       DataColumn(label: SizedBox(width: 150, child: Text('App Name', style: TextStyle(fontWeight: FontWeight.bold)))),

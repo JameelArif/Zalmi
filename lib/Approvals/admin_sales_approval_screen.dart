@@ -262,7 +262,7 @@ class _AdminSalesApprovalScreenState extends State<AdminSalesApprovalScreen> {
             const SizedBox(height: 12),
 
             DropdownButtonFormField<int?>(
-              value: _employeeId,
+              initialValue: _employeeId,
               items: [
                 const DropdownMenuItem(value: null, child: Text("All Employees")),
                 ..._employees.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))),
@@ -281,7 +281,7 @@ class _AdminSalesApprovalScreenState extends State<AdminSalesApprovalScreen> {
             const SizedBox(height: 10),
 
             DropdownButtonFormField<int?>(
-              value: _applicationId,
+              initialValue: _applicationId,
               items: [
                 const DropdownMenuItem(value: null, child: Text("All Apps")),
                 ..._apps.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),

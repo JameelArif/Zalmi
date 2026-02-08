@@ -442,7 +442,7 @@ class _TransferDialogState extends State<TransferDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                value: fromAccountId,
+                initialValue: fromAccountId,
                 decoration: InputDecoration(labelText: 'From Account', prefixIcon: const Icon(Icons.account_balance, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                 items: widget.accounts.map((a) => DropdownMenuItem(
                   value: a.id,
@@ -460,7 +460,7 @@ class _TransferDialogState extends State<TransferDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                value: toAccountId,
+                initialValue: toAccountId,
                 decoration: InputDecoration(labelText: 'To Account', prefixIcon: const Icon(Icons.account_balance, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                 items: widget.accounts.where((a) => a.id != fromAccountId).map((a) => DropdownMenuItem(
                   value: a.id,
@@ -531,7 +531,7 @@ class _WithdrawalDialogState extends State<WithdrawalDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                value: accountId,
+                initialValue: accountId,
                 decoration: InputDecoration(labelText: 'Account', prefixIcon: const Icon(Icons.account_balance, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
                 items: widget.accounts.map((a) => DropdownMenuItem(
                   value: a.id,

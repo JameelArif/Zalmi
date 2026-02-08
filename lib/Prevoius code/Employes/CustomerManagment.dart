@@ -162,7 +162,7 @@ class _CustomerManagementState extends State<CustomerManagement> {
                         boxShadow: [BoxShadow(color: Colors.grey[200]!, blurRadius: 4, offset: const Offset(0, 2))],
                       ),
                       child: DataTable(
-                        headingRowColor: MaterialStateColor.resolveWith((_) => Colors.blue[100]!),
+                        headingRowColor: WidgetStateColor.resolveWith((_) => Colors.blue[100]!),
                         dataRowHeight: 80,
                         columns: const [
                           DataColumn(label: SizedBox(width: 150, child: Text('Customer Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
@@ -229,7 +229,7 @@ class _CustomerManagementState extends State<CustomerManagement> {
                           boxShadow: [BoxShadow(color: Colors.grey[200]!, blurRadius: 4, offset: const Offset(0, 2))],
                         ),
                         child: DataTable(
-                          headingRowColor: MaterialStateColor.resolveWith((_) => Colors.green[100]!),
+                          headingRowColor: WidgetStateColor.resolveWith((_) => Colors.green[100]!),
                           dataRowHeight: 70,
                           columns: const [
                             DataColumn(label: SizedBox(width: 140, child: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
@@ -467,7 +467,7 @@ class _AddAppBalanceDialogState extends State<AddAppBalanceDialog> {
             children: [
               Text('Customer: ${widget.customer.customerName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               const SizedBox(height: 16),
-              isLoadingApps ? const CircularProgressIndicator() : DropdownButtonFormField<int>(value: selectedAppId, decoration: InputDecoration(labelText: 'Select App', prefixIcon: const Icon(Icons.apps, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))), items: apps.map((app) => DropdownMenuItem(value: app['id'] as int, child: Text(app['app_name'] as String))).toList(), onChanged: (value) => setState(() => selectedAppId = value), validator: (v) => v == null ? 'Required' : null),
+              isLoadingApps ? const CircularProgressIndicator() : DropdownButtonFormField<int>(initialValue: selectedAppId, decoration: InputDecoration(labelText: 'Select App', prefixIcon: const Icon(Icons.apps, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))), items: apps.map((app) => DropdownMenuItem(value: app['id'] as int, child: Text(app['app_name'] as String))).toList(), onChanged: (value) => setState(() => selectedAppId = value), validator: (v) => v == null ? 'Required' : null),
               const SizedBox(height: 12),
               TextFormField(controller: creditController, decoration: InputDecoration(labelText: 'Opening Credit (PKR)', prefixIcon: const Icon(Icons.account_balance_wallet, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))), keyboardType: TextInputType.number, validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
             ],

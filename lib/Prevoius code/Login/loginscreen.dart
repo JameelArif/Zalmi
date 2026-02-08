@@ -284,7 +284,7 @@ class _LoginPageState extends State<LoginPage> {
                           Checkbox(
                             value: false,
                             onChanged: null,
-                            fillColor: MaterialStateProperty.all(
+                            fillColor: WidgetStateProperty.all(
                               Colors.deepPurple[100],
                             ),
                           ),

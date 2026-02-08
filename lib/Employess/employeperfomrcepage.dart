@@ -289,7 +289,7 @@ class _EmployeePerformancePageState extends State<EmployeePerformancePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int?>(
-              value: _appId,
+              initialValue: _appId,
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text('All Apps')),
                 ..._apps.map((a) => DropdownMenuItem<int?>(value: a.id, child: Text(a.name))),
@@ -299,7 +299,7 @@ class _EmployeePerformancePageState extends State<EmployeePerformancePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _paymentType,
+              initialValue: _paymentType,
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('All Payments')),
                 DropdownMenuItem(value: 'cash', child: Text('Cash')),

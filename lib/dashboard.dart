@@ -183,7 +183,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     double sum = 0;
-    for (final r in rows as List) {
+    for (final r in rows) {
       sum += _toDouble(r['total_credit']);
     }
 
@@ -238,7 +238,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     final list = <_AppStock>[];
-    for (final r in rows as List) {
+    for (final r in rows) {
       final name = (r['application_name'] ?? '').toString();
 
       // prefer total_coins, fallback to current_coins

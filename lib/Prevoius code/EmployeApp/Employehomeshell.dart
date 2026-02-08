@@ -124,6 +124,7 @@ class _EmployeeHomeShellState extends State<EmployeeHomeShell> {
                 },
               ),
               PopupMenuItem(
+                onTap: _handleLogout,
                 child: const Row(
                   children: [
                     Icon(Icons.logout, size: 20, color: Colors.red),
@@ -131,7 +132,6 @@ class _EmployeeHomeShellState extends State<EmployeeHomeShell> {
                     Text('Logout', style: TextStyle(color: Colors.red)),
                   ],
                 ),
-                onTap: _handleLogout,
               ),
             ],
           ),

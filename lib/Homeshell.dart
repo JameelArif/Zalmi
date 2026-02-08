@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zalmiwholeseller/EXPENSIS/expenses_management_ui.dart';
 import 'package:zalmiwholeseller/dashboard.dart';
-import 'package:zalmiwholeseller/profile.dart';
 
 import 'BankAccounts/Bankaccountmanagementui.dart';
 import 'Customers/Customermanagementfrontend.dart';

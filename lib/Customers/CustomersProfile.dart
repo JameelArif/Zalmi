@@ -286,7 +286,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<int>(
-                    value: selectedAppId,
+                    initialValue: selectedAppId,
                     items: _creditRows
                         .map((r) => DropdownMenuItem<int>(
                       value: r.appId,
@@ -301,7 +301,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
-                    value: selectedBankId,
+                    initialValue: selectedBankId,
                     items: _banks
                         .map((b) => DropdownMenuItem<int>(
                       value: b.id,
@@ -708,7 +708,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int?>(
-              value: _salesAppId,
+              initialValue: _salesAppId,
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text('All Apps')),
                 ..._apps.map((a) => DropdownMenuItem<int?>(
@@ -724,7 +724,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _salesPaymentType,
+              initialValue: _salesPaymentType,
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('All Payments')),
                 DropdownMenuItem(value: 'cash', child: Text('Cash')),
@@ -883,7 +883,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int?>(
-              value: _recAppId,
+              initialValue: _recAppId,
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text('All Apps')),
                 ..._apps.map((a) => DropdownMenuItem<int?>(
